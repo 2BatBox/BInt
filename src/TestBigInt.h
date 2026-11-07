@@ -1,11 +1,13 @@
 #pragma once
 
 #include "BigInt.h"
+#include "hex.h"
 #include "jtf/utils/Perf.h"
 
 #include <inttypes.h>
 #include <algorithm>
 #include <random>
+#include <climits>
 
 #define ASSERT(exp) { \
 	if(not (exp)) { \
@@ -16,83 +18,120 @@
 	} \
 };
 
-//namespace std {
-//
-//	static std::string to_string(const __int128_t& i128) {
-//		std::string result;
-//		__int128_t val = i128;
-//		const bool is_neg = val < 0;
-//		if(val) {
-//			result.push_back('0' + std::abs(val % 10));
-//			val /= 10;
-//		}
-//		val = std::abs(val);
-//		while(val) {
-//			result.push_back('0' + val % 10);
-//			val /= 10;
-//		}
-//		if(is_neg) {
-//			result.push_back('-');
-//		}
-//		std::reverse(result.begin(), result.end());
-//		return result;
-//	}
-//
-//};
-
 class TestBigInt {
 
 	template <typename T, std::enable_if_t<(std::is_integral_v<T>), int> = 0>
-	struct UniformRanGen {
+	struct UniformIntGen {
 		std::mt19937_64 rnd;
 		std::uniform_int_distribution<T> distr;
-		UniformRanGen(const T min = std::numeric_limits<T>::min(), const T max = std::numeric_limits<T>::max()) : rnd(0), distr(min, max) {}
+		UniformIntGen(const T min = std::numeric_limits<T>::min(), const T max = std::numeric_limits<T>::max()) : rnd(0), distr(min, max) {}
 		T next() {
 			return distr(rnd);
 		}
 	};
 
-#define ITERATE_EQUAL_WIDTH_INTEGERS(func, rounds) { \
+	template <typename BINT>
+	struct UniformBigIntGen {
+		std::mt19937_64 rnd;
+		std::uniform_int_distribution<size_t> gen_size{1u, BINT::NUMBER_WIDTH_BYTES};
+		std::uniform_int_distribution<int8_t> gen_data;
+
+		BINT next() {
+			BINT result;
+			size_t size_bytes = gen_size(rnd);
+			while(size_bytes--) {
+				result <<= 8u;
+				result += BINT(gen_data(rnd));
+			}
+			return result;
+		}
+	};
+
+	static constexpr size_t CHARS_PER_SHORT = sizeof(signed short);
+	static constexpr size_t CHARS_PER_INT = sizeof(signed int);
+	static constexpr size_t CHARS_PER_LONG = sizeof(signed long);
+	static constexpr size_t SHORTS_PER_INT = sizeof(signed int) / sizeof(signed short);
+	static constexpr size_t SHORTS_PER_LONG = sizeof(signed long) / sizeof(signed short);
+	static constexpr size_t INT_PER_LONG = sizeof(signed long) / sizeof(signed int);
+
+#define ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGERS(func, rounds) { \
 	printf("->TestBigInt::"#func"()\n"); \
-	func<BigInt<int8_t, 1>, int8_t>(rounds); \
-	func<BigInt<int8_t, 2>, int16_t>(rounds); \
-	func<BigInt<int8_t, 4>, int32_t>(rounds); \
-	func<BigInt<int8_t, 8>, int64_t>(rounds); \
-	func<BigInt<int8_t, 16>, __int128_t>(rounds); \
-	func<BigInt<int16_t, 1>, int16_t>(rounds); \
-	func<BigInt<int16_t, 2>, int32_t>(rounds); \
-	func<BigInt<int16_t, 4>, int64_t>(rounds); \
-	func<BigInt<int16_t, 8>, __int128_t>(rounds); \
-	func<BigInt<int32_t, 1>, int32_t>(rounds); \
-	func<BigInt<int32_t, 2>, int64_t>(rounds); \
-	func<BigInt<int32_t, 4>, __int128_t>(rounds); \
-	func<BigInt<int64_t, 1>, int64_t>(rounds); \
-	func<BigInt<int64_t, 2>, __int128_t>(rounds); \
+	func<BigInt<signed char, 1u>, signed char>(rounds); \
+	func<BigInt<signed char, CHARS_PER_SHORT>, signed short>(rounds); \
+	func<BigInt<signed char, CHARS_PER_INT>, signed int>(rounds); \
+	func<BigInt<signed char, CHARS_PER_LONG>, signed long>(rounds); \
+	func<BigInt<signed short, 1u>, signed short>(rounds); \
+	func<BigInt<signed short, SHORTS_PER_INT>, signed int>(rounds); \
+	func<BigInt<signed short, SHORTS_PER_LONG>, signed long>(rounds); \
+	func<BigInt<signed int, 1u>, signed int>(rounds); \
+	func<BigInt<signed int, INT_PER_LONG>, signed long>(rounds); \
+	func<BigInt<signed long, 1u>, signed long>(rounds); \
 }
 
-#define ITERATE_EQUAL_WIDTH_BIG_INT(func, rounds) { \
+#define ITERATE_BIGINT_AND_NARROWER_INTEGERS(func, rounds) { \
 	printf("->TestBigInt::"#func"()\n"); \
-	func<BigInt<int8_t,   1>, BigInt<int8_t,  1>>(rounds); \
-	func<BigInt<int8_t,   2>, BigInt<int16_t, 1>>(rounds); \
-	func<BigInt<int8_t,   4>, BigInt<int16_t, 2>>(rounds); \
-	func<BigInt<int8_t,   6>, BigInt<int16_t, 3>>(rounds); \
-	func<BigInt<int8_t,   4>, BigInt<int32_t, 1>>(rounds); \
-	func<BigInt<int8_t,   8>, BigInt<int32_t, 2>>(rounds); \
-	func<BigInt<int8_t,  12>, BigInt<int32_t, 3>>(rounds); \
-	func<BigInt<int8_t,   8>, BigInt<int64_t, 1>>(rounds); \
-	func<BigInt<int8_t,  16>, BigInt<int64_t, 2>>(rounds); \
-	func<BigInt<int8_t,  24>, BigInt<int64_t, 3>>(rounds); \
-	func<BigInt<int16_t,  1>, BigInt<int16_t, 1>>(rounds); \
-	func<BigInt<int16_t,  2>, BigInt<int32_t, 1>>(rounds); \
-	func<BigInt<int16_t,  4>, BigInt<int32_t, 2>>(rounds); \
-	func<BigInt<int16_t,  6>, BigInt<int32_t, 3>>(rounds); \
-	func<BigInt<int16_t,  4>, BigInt<int64_t, 1>>(rounds); \
-	func<BigInt<int16_t,  8>, BigInt<int64_t, 2>>(rounds); \
-	func<BigInt<int16_t, 12>, BigInt<int64_t, 3>>(rounds); \
-	func<BigInt<int32_t,  1>, BigInt<int32_t, 1>>(rounds); \
-	func<BigInt<int32_t,  2>, BigInt<int64_t, 1>>(rounds); \
-	func<BigInt<int32_t,  4>, BigInt<int64_t, 2>>(rounds); \
-	func<BigInt<int32_t,  6>, BigInt<int64_t, 3>>(rounds); \
+	func<BigInt<signed char, 2u>, signed char>(rounds); \
+	func<BigInt<signed char, CHARS_PER_SHORT + 1u>, signed short>(rounds); \
+	func<BigInt<signed char, CHARS_PER_INT + 1u>, signed int>(rounds); \
+	func<BigInt<signed char, CHARS_PER_LONG + 1u>, signed long>(rounds); \
+	func<BigInt<signed short, 2u>, signed short>(rounds); \
+	func<BigInt<signed short, SHORTS_PER_INT + 1u>, signed int>(rounds); \
+	func<BigInt<signed short, SHORTS_PER_LONG + 1u>, signed long>(rounds); \
+	func<BigInt<signed int, 2u>, signed int>(rounds); \
+	func<BigInt<signed int, INT_PER_LONG + 1u>, signed long>(rounds); \
+	func<BigInt<signed long, 2u>, signed long>(rounds); \
+}
+
+#define ITERATE_BIGINT_AND_EQUAL_WIDTH_BIGINT(func, rounds) { \
+	printf("->TestBigInt::"#func"()\n"); \
+	func<BigInt<signed char,  1u>, BigInt<signed char,  1u>>(rounds); \
+	func<BigInt<signed char,  CHARS_PER_SHORT>, BigInt<signed short, 1u>>(rounds); \
+	func<BigInt<signed char,  CHARS_PER_SHORT * 2u>, BigInt<signed short, 2u>>(rounds); \
+	func<BigInt<signed char,  CHARS_PER_SHORT * 3u>, BigInt<signed short, 3u>>(rounds); \
+	func<BigInt<signed char,  CHARS_PER_INT>, BigInt<signed int, 1u>>(rounds); \
+	func<BigInt<signed char,  CHARS_PER_INT * 2u>, BigInt<signed int, 2u>>(rounds); \
+	func<BigInt<signed char,  CHARS_PER_INT * 3u>, BigInt<signed int, 3u>>(rounds); \
+	func<BigInt<signed char,  CHARS_PER_LONG>, BigInt<signed long, 1u>>(rounds); \
+	func<BigInt<signed char,  CHARS_PER_LONG * 2u>, BigInt<signed long, 2u>>(rounds); \
+	func<BigInt<signed char,  CHARS_PER_LONG * 3u>, BigInt<signed long, 3u>>(rounds); \
+	func<BigInt<signed short,  1u>, BigInt<signed short, 1u>>(rounds); \
+	func<BigInt<signed short,  SHORTS_PER_INT>, BigInt<signed int, 1u>>(rounds); \
+	func<BigInt<signed short,  SHORTS_PER_INT * 2u>, BigInt<signed int, 2u>>(rounds); \
+	func<BigInt<signed short,  SHORTS_PER_INT * 3u>, BigInt<signed int, 3u>>(rounds); \
+	func<BigInt<signed short,  SHORTS_PER_LONG>, BigInt<signed long, 1u>>(rounds); \
+	func<BigInt<signed short,  SHORTS_PER_LONG * 2u>, BigInt<signed long, 2u>>(rounds); \
+	func<BigInt<signed short,  SHORTS_PER_LONG * 3u>, BigInt<signed long, 3u>>(rounds); \
+	func<BigInt<signed int,  1u>, BigInt<signed int, 1u>>(rounds); \
+	func<BigInt<signed int,  INT_PER_LONG>, BigInt<signed long, 1u>>(rounds); \
+	func<BigInt<signed int,  INT_PER_LONG * 2u>, BigInt<signed long, 2u>>(rounds); \
+	func<BigInt<signed int,  INT_PER_LONG * 3u>, BigInt<signed long, 3u>>(rounds); \
+	func<BigInt<signed long, 1u>, BigInt<signed long, 1u>>(rounds); \
+}
+
+#define ITERATE_BIGINT_AND_WIDER_BIGINT(func, rounds) { \
+	printf("->TestBigInt::"#func"()\n"); \
+	func<BigInt<signed char,  1u>, BigInt<signed char,  2u>>(rounds); \
+	func<BigInt<signed char,  CHARS_PER_SHORT>, BigInt<signed short, 2u>>(rounds); \
+	func<BigInt<signed char,  CHARS_PER_SHORT * 2u>, BigInt<signed short, 3u>>(rounds); \
+	func<BigInt<signed char,  CHARS_PER_SHORT * 3u>, BigInt<signed short, 4u>>(rounds); \
+	func<BigInt<signed char,  CHARS_PER_INT>, BigInt<signed int, 2u>>(rounds); \
+	func<BigInt<signed char,  CHARS_PER_INT * 2u>, BigInt<signed int, 3u>>(rounds); \
+	func<BigInt<signed char,  CHARS_PER_INT * 3u>, BigInt<signed int, 4u>>(rounds); \
+	func<BigInt<signed char,  CHARS_PER_LONG>, BigInt<signed long, 2u>>(rounds); \
+	func<BigInt<signed char,  CHARS_PER_LONG * 2u>, BigInt<signed long, 3u>>(rounds); \
+	func<BigInt<signed char,  CHARS_PER_LONG * 3u>, BigInt<signed long, 4u>>(rounds); \
+	func<BigInt<signed short,  1u>, BigInt<signed short, 2u>>(rounds); \
+	func<BigInt<signed short,  SHORTS_PER_INT>, BigInt<signed int, 2u>>(rounds); \
+	func<BigInt<signed short,  SHORTS_PER_INT * 2u>, BigInt<signed int, 3u>>(rounds); \
+	func<BigInt<signed short,  SHORTS_PER_INT * 3u>, BigInt<signed int, 4u>>(rounds); \
+	func<BigInt<signed short,  SHORTS_PER_LONG>, BigInt<signed long, 2u>>(rounds); \
+	func<BigInt<signed short,  SHORTS_PER_LONG * 2u>, BigInt<signed long, 3u>>(rounds); \
+	func<BigInt<signed short,  SHORTS_PER_LONG * 3u>, BigInt<signed long, 4u>>(rounds); \
+	func<BigInt<signed int,  1u>, BigInt<signed int, 2u>>(rounds); \
+	func<BigInt<signed int,  INT_PER_LONG>, BigInt<signed long, 2u>>(rounds); \
+	func<BigInt<signed int,  INT_PER_LONG * 2u>, BigInt<signed long, 3u>>(rounds); \
+	func<BigInt<signed int,  INT_PER_LONG * 3u>, BigInt<signed long, 4u>>(rounds); \
+	func<BigInt<signed long, 1u>, BigInt<signed long, 2u>>(rounds); \
 }
 
 public:
@@ -101,18 +140,23 @@ public:
 
 		const size_t rounds = 10000;
 
-		ITERATE_EQUAL_WIDTH_INTEGERS(test_load_store_int, rounds);
-//		ITERATE_EQUAL_WIDTH_BIG_INT(test_load_store_big_int, rounds);
+		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGERS(test_load_store_int, rounds);
+		ITERATE_BIGINT_AND_NARROWER_INTEGERS(test_load_store_int, rounds);
 
-		ITERATE_EQUAL_WIDTH_INTEGERS(test_min_max, rounds);
-		ITERATE_EQUAL_WIDTH_INTEGERS(test_bitwise, rounds);
-		ITERATE_EQUAL_WIDTH_INTEGERS(test_shift, rounds);
-		ITERATE_EQUAL_WIDTH_INTEGERS(test_relational, rounds);
-		ITERATE_EQUAL_WIDTH_INTEGERS(test_add_sub, rounds);
-		ITERATE_EQUAL_WIDTH_INTEGERS(test_mult, rounds);
-		ITERATE_EQUAL_WIDTH_INTEGERS(test_div, rounds);
-		ITERATE_EQUAL_WIDTH_INTEGERS(test_sign_change, rounds);
-//		test_type_conversion();
+		ITERATE_BIGINT_AND_EQUAL_WIDTH_BIGINT(test_load_store_big_int, rounds);
+		ITERATE_BIGINT_AND_WIDER_BIGINT(test_load_store_big_int, rounds);
+
+		test_type_conversion_bigint_int();
+		test_type_conversion_bigint_bigint();
+
+//		ITERATE_EQUAL_WIDTH_INTEGERS(test_min_max, rounds);
+//		ITERATE_EQUAL_WIDTH_INTEGERS(test_bitwise, rounds);
+//		ITERATE_EQUAL_WIDTH_INTEGERS(test_shift, rounds);
+//		ITERATE_EQUAL_WIDTH_INTEGERS(test_relational, rounds);
+//		ITERATE_EQUAL_WIDTH_INTEGERS(test_add_sub, rounds);
+//		ITERATE_EQUAL_WIDTH_INTEGERS(test_mult, rounds);
+//		ITERATE_EQUAL_WIDTH_INTEGERS(test_div, rounds);
+//		ITERATE_EQUAL_WIDTH_INTEGERS(test_sign_change, rounds);
 //		test_constexpr_values();
 
 //		const size_t perf_rounds = 1000ull*1000ull*1ull;
@@ -129,8 +173,8 @@ public:
 
 	template <typename BigType_t, typename Integer>
 	void test_load_store_int(size_t rounds) {
-		static_assert(sizeof(BigType_t) == sizeof(Integer));
-		UniformRanGen<Integer> gen;
+		static_assert(sizeof(BigType_t) >= sizeof(Integer));
+		UniformIntGen<Integer> gen;
 		BigType_t bint;
 
 		test_load_store_int_value<BigType_t, Integer>(bint, -1);
@@ -152,31 +196,93 @@ public:
 	}
 
 	template <typename A, typename B>
-	void test_load_store_big_int(size_t) {
-		static_assert(A::NUMBER_WIDTH_BYTES == B::NUMBER_WIDTH_BYTES);
-//		ASSERT(A::max() == B::max());
+	void test_load_store_big_int(size_t rounds) {
+		static_assert(A::NUMBER_WIDTH_BYTES <= B::NUMBER_WIDTH_BYTES);
+		UniformBigIntGen<A> gen_a;
+
+		test_load_store_big_int_value<A, B>(A(-1));
+		test_load_store_big_int_value<A, B>(A(0));
+		test_load_store_big_int_value<A, B>(A(1));
 		test_load_store_big_int_value<A, B>(A::max());
 		test_load_store_big_int_value<A, B>(A::min());
+
+		while(rounds--) {
+			test_load_store_big_int_value<A, B>(gen_a.next());
+		}
 	}
 
 	template <typename A, typename B>
-	void test_load_store_big_int_value(const A& in) {
-		B bi(in);
-		A out(bi);
-		ASSERT(out == in);
-		ASSERT(bi == in);
+	void test_load_store_big_int_value(const A& a_in) {
+		static_assert(A::NUMBER_WIDTH_BYTES <= B::NUMBER_WIDTH_BYTES);
+		B b_in(a_in);
+		A a_out(b_in);
+		ASSERT(a_in == a_out);
+		ASSERT(a_out == a_in);
 
-		bi = in;
-		out = bi;
-		ASSERT(out == in);
-		ASSERT(bi == in);
+		b_in = a_in;
+		a_out = A(b_in);
+		ASSERT(a_in == a_out);
+		ASSERT(a_out == a_in);
 	}
 
+	// ----------------------------------------------------------------------------
+	// Type conversion.
+	// ----------------------------------------------------------------------------
+	static void func_in_char(signed char) {}
+	static void func_in_int(signed int) {}
 
+	static signed char func_out_char()   { return 0; }
+	static signed int func_out_int()   { return 0; }
 
+	static void test_type_conversion_bigint_int() {
+		printf("->TestBigInt::test_type_conversion_bigint_int()\n");
 
+		BigInt<signed char, 1> bi_0(func_out_char());
+		BigInt<signed char, 1> bi_1(func_out_int()); // <- Allowed, explicit convertion.
 
+		bi_0 = func_out_char();
+//		bi_1 = func_out_int(); // <- Compilation error. int is wider than BigInt<signed char, 1>.
 
+		// Implicit conversion from BigInt to integer is legal since the BigInt value range is within the integer value range.
+		func_in_char(BigInt<signed char, 1>::min());
+		func_in_int(BigInt<signed char, 1>::min());
+		func_in_int(BigInt<signed int, 1>::min());
+
+		// Explicit conversion must be performed since the integer value range is wider than the value range of BigInt.
+		func_in_char(static_cast<signed char>(BigInt<signed char, 2u>::min()));
+		func_in_char(static_cast<signed char>(BigInt<signed int, 1u>::min()));
+		func_in_int(static_cast<signed int>(BigInt<signed char, 99u>::min()));
+		func_in_int(static_cast<signed int>(BigInt<signed int, 2u>::min()));
+	}
+
+	static void func_in_bint_char(BigInt<signed char, 3u>) {}
+	static void func_in_bint_int(BigInt<signed int, 3u>) {}
+
+	static BigInt<signed char, 3u> func_out_bint_char() { return BigInt<signed char, 3u>(0); }
+	static BigInt<signed int, 3u> func_out_bint_int()   { return BigInt<signed int, 3u>(0); }
+
+	static void test_type_conversion_bigint_bigint() {
+		printf("->TestBigInt::test_type_conversion_bigint_bigint()\n");
+
+		BigInt<signed char, 3> bi_0(func_out_bint_char());
+		BigInt<signed char, 3> bi_1(func_out_bint_int());
+
+		bi_0 = func_out_bint_char();
+//		bi_1 = func_out_bint_int(); // <- Compilation error. BigInt<signed int, 1u> is wider than BigInt<signed char, 1u>.
+
+		// Implicit conversion.
+		func_in_bint_char(BigInt<signed char, 1u>::min());
+		func_in_bint_char(BigInt<signed char, 2u>::min());
+		func_in_bint_char(BigInt<signed char, 3u>::min());
+		func_in_bint_int(BigInt<signed char, 1>::min());
+		func_in_bint_int(BigInt<signed int, 1>::min());
+
+		// Explicit conversion must be performed.
+		func_in_bint_char(static_cast<int8_t>(BigInt<int16_t, 1>::min()));
+		func_in_i16(static_cast<int8_t>(BigInt<int8_t, 3>::min()));
+		func_in_i16(static_cast<int8_t>(BigInt<int16_t, 4>::min()));
+		func_in_i32(static_cast<int8_t>(BigInt<int64_t, 2>::min()));
+	}
 
 
 
@@ -202,7 +308,7 @@ public:
 	template <typename BigType_t, typename Integer>
 	void test_bitwise(size_t rounds) {
 		static_assert(BigType_t::NUMBER_WIDTH_BYTES == sizeof(Integer));
-		UniformRanGen<Integer> gen;
+		UniformIntGen<Integer> gen;
 		BigType_t bx;
 		BigType_t by;
 		BigType_t bop;
@@ -243,8 +349,8 @@ public:
 	template <typename BigType_t, typename Integer>
 	void test_shift(size_t rounds) {
 		static_assert(BigType_t::NUMBER_WIDTH_BYTES == sizeof(Integer));
-		UniformRanGen<Integer> gen;
-		UniformRanGen<size_t> gen_shift(0, (sizeof(Integer) * 8u) - 1u);
+		UniformIntGen<Integer> gen;
+		UniformIntGen<size_t> gen_shift(0, (sizeof(Integer) * 8u) - 1u);
 		BigType_t bx;
 		BigType_t bop;
 		while(rounds--) {
@@ -273,7 +379,7 @@ public:
 	template <typename BigType_t, typename Integer>
 	void test_relational(size_t rounds) {
 		static_assert(BigType_t::NUMBER_WIDTH_BYTES == sizeof(Integer));
-		UniformRanGen<Integer> gen;
+		UniformIntGen<Integer> gen;
 		BigType_t bx;
 		BigType_t by;
 		while(rounds--) {
@@ -303,7 +409,7 @@ public:
 	template <typename BigType_t, typename Integer>
 	void test_add_sub(size_t rounds) {
 		static_assert(BigType_t::NUMBER_WIDTH_BYTES == sizeof(Integer));
-		UniformRanGen<Integer> gen;
+		UniformIntGen<Integer> gen;
 		BigType_t bx;
 		BigType_t by;
 		BigType_t bop;
@@ -337,7 +443,7 @@ public:
 	template <typename BigType_t, typename Integer>
 	void test_mult(size_t rounds) {
 		static_assert(BigType_t::NUMBER_WIDTH_BYTES == sizeof(Integer));
-		UniformRanGen<Integer> gen;
+		UniformIntGen<Integer> gen;
 		BigType_t bx;
 		BigType_t by;
 		BigType_t bop;
@@ -364,8 +470,8 @@ public:
 	template <typename BigType_t, typename Integer>
 	void test_div(size_t rounds) {
 		static_assert(BigType_t::NUMBER_WIDTH_BYTES == sizeof(Integer));
-		UniformRanGen<Integer> gen;
-		UniformRanGen<Integer> gen_sqrt(-std::sqrt(std::numeric_limits<Integer>::max()), std::sqrt(std::numeric_limits<Integer>::max()));
+		UniformIntGen<Integer> gen;
+		UniformIntGen<Integer> gen_sqrt(-std::sqrt(std::numeric_limits<Integer>::max()), std::sqrt(std::numeric_limits<Integer>::max()));
 		BigType_t bx;
 		BigType_t by;
 		BigType_t bop;
@@ -394,7 +500,7 @@ public:
 	template <typename BigType_t, typename Integer>
 	void test_sign_change(size_t rounds) {
 		static_assert(BigType_t::NUMBER_WIDTH_BYTES == sizeof(Integer));
-		UniformRanGen<Integer> gen;
+		UniformIntGen<Integer> gen;
 		BigType_t bx;
 		while(rounds--) {
 			const Integer ix = gen.next();
@@ -418,38 +524,6 @@ public:
 		ASSERT(big_int == int_ref);
 	}
 
-	// ----------------------------------------------------------------------------
-	// Type conversion.
-	// ----------------------------------------------------------------------------
-	static void dummy_i8(int8_t) {}
-	static void dummy_i16(int16_t) {}
-	static void dummy_i32(int32_t) {}
-
-	static void test_type_conversion() {
-		printf("->TestBigInt::test_type_conversion()\n");
-
-		BigInt<int8_t, 3> bi24_0(static_cast<int8_t>(-1));
-		BigInt<int8_t, 3> bi24_1(static_cast<int16_t>(-1));
-//		BigInt<int8_t, 3> bi24_1(static_cast<int32_t>(-1)); // <- Compilation error. int32_t is wider.
-
-		bi24_0 = static_cast<int8_t>(-1);
-		bi24_1 = static_cast<int16_t>(-1);
-//		bi24_1 = static_cast<int32_t>(-1); // <- Compilation error. int32_t is wider.
-
-		// Implicit conversion from BigInt to integer is legal since the BigInt value range is within the integer value range.
-		dummy_i8(BigInt<int8_t, 1>::min());
-		dummy_i16(BigInt<int8_t, 2>::min());
-		dummy_i16(BigInt<int16_t, 1>::min());
-		dummy_i32(BigInt<int8_t, 4>::min());
-		dummy_i32(BigInt<int16_t, 2>::min());
-		dummy_i32(BigInt<int32_t, 1>::min());
-
-		// Explicit conversion must be performed since the integer value range is wider than the value range of BigInt.
-		dummy_i8(static_cast<int8_t>(BigInt<int16_t, 1>::min()));
-		dummy_i16(static_cast<int8_t>(BigInt<int8_t, 3>::min()));
-		dummy_i16(static_cast<int8_t>(BigInt<int16_t, 4>::min()));
-		dummy_i32(static_cast<int8_t>(BigInt<int64_t, 2>::min()));
-	}
 
 	// -----------------------------------------------------------------------
 	// Performance test.
@@ -474,7 +548,7 @@ public:
 
 		const auto min_int = static_cast<Integer>(BigType_t::min());
 		const auto max_int = static_cast<Integer>(BigType_t::max());
-		UniformRanGen<Integer> gen_half(min_int / 2, max_int / 2);
+		UniformIntGen<Integer> gen_half(min_int / 2, max_int / 2);
 
 		std::vector<BigType_t> big;
 		std::vector<Integer> input;
@@ -519,7 +593,7 @@ public:
 
 		const auto min_int = static_cast<Integer>(BigType_t::min());
 		const auto max_int = static_cast<Integer>(BigType_t::max());
-		UniformRanGen<Integer> gen_full(min_int / 2, max_int / 2);
+		UniformIntGen<Integer> gen_full(min_int / 2, max_int / 2);
 
 		std::vector<Integer> ix;
 		std::vector<Integer> iy;
@@ -567,7 +641,7 @@ public:
 		jtf::utils::Perf perf_mult("mult()         ");
 
 		const auto max_int = static_cast<Integer>(BigType_t::max());
-		UniformRanGen<Integer> gen_sqrt(-std::sqrt(max_int), std::sqrt(max_int));
+		UniformIntGen<Integer> gen_sqrt(-std::sqrt(max_int), std::sqrt(max_int));
 
 		std::vector<Integer> ix;
 		std::vector<Integer> iy;
@@ -609,8 +683,8 @@ public:
 
 		const auto min_int = static_cast<Integer>(BigType_t::min());
 		const auto max_int = static_cast<Integer>(BigType_t::max());
-		UniformRanGen<Integer> gen_full(min_int, max_int);
-		UniformRanGen<Integer> gen_sqrt(-std::sqrt(max_int), std::sqrt(max_int));
+		UniformIntGen<Integer> gen_full(min_int, max_int);
+		UniformIntGen<Integer> gen_sqrt(-std::sqrt(max_int), std::sqrt(max_int));
 
 		std::vector<Integer> ix;
 		std::vector<Integer> iy;
