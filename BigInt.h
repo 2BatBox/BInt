@@ -5,11 +5,6 @@
 #include <array>
 #include <climits>
 
-static uint64_t _tmp_call_cnt = 0;
-static uint64_t _tmp_carry_mult_cnt = 0;
-static uint64_t _tmp_mult_cnt = 0;
-static uint64_t _tmp_sub_cnt = 0;
-
 /**
  * @tparam Chunk Any signed integral type.
  * @tparam WIDTH_CHUNKS
@@ -48,6 +43,7 @@ public:
 	static constexpr size_t CHUNK_WIDTH_BITS = CHUNK_WIDTH_BYTES * CHAR_BIT;
 	static constexpr size_t HALF_WIDTH_CHUNKS = WIDTH_CHUNKS * 2u;
 	static constexpr size_t HALF_CHUNK_WIDTH_BITS = CHUNK_WIDTH_BITS / 2u;
+	static constexpr size_t NUMBER_WIDTH_CHUNKS = WIDTH_CHUNKS;
 	static constexpr size_t NUMBER_WIDTH_BYTES = CHUNK_WIDTH_BYTES * WIDTH_CHUNKS;
 	static constexpr size_t NUMBER_WIDTH_BITS = CHUNK_WIDTH_BITS * WIDTH_CHUNKS;
 	
@@ -87,19 +83,14 @@ public:
 
 	// From not wider BigInt. Implicit conversion.
 	template <typename C, size_t W, std::enable_if_t<((sizeof(C) * W) <= NUMBER_WIDTH_BYTES), int> = 0>
-	constexpr BigInt(const BigInt<C, W>& rv) {
+	constexpr BigInt(const BigInt<C, W>& rv) : _number{0}{
 		load_big_int(rv);
 	}
 
 	// From wider BigInt. Explicit conversion is needed.
 	template <typename C, size_t W, std::enable_if_t<((sizeof(C) * W) > NUMBER_WIDTH_BYTES), int> = 0>
-	constexpr explicit BigInt(const BigInt<C, W>& rv) {
+	constexpr explicit BigInt(const BigInt<C, W>& rv) : _number{0}{
 		load_big_int(rv);
-	}
-
-	// From string.
-	constexpr explicit BigInt(std::string_view str) : _number{0} {
-//		load_string(str);
 	}
 
 	// ----------------------------------------------------------------------------
@@ -108,6 +99,10 @@ public:
 	// From not wider integer.
 	template <typename T, std::enable_if_t<(std::is_integral_v<T> && std::is_signed_v<T> && sizeof(T) <= NUMBER_WIDTH_BYTES), int> = 0>
 	constexpr BigInt& operator=(const T& init) {
+		size_t idx = 0;
+		while(idx < WIDTH_CHUNKS) {
+			_number[idx++] = 0;
+		}
 		load_integer(init);
 		return *this;
 	}
@@ -158,15 +153,12 @@ public:
 	// ----------------------------------------------------------------------------
 	// Bitwise operators.
 	// ----------------------------------------------------------------------------
-
-	// not
 	constexpr BigInt operator~() const {
 		BigInt result(*this);
 		result.bitwise_not();
 		return result;
 	}
 
-	// and
 	constexpr BigInt& operator&=(const BigInt& rv) {
 		bitwise_and(rv);
 		return *this;
@@ -178,7 +170,6 @@ public:
 		return result;
 	}
 
-	// or
 	constexpr BigInt& operator|=(const BigInt& rv) {
 		bitwise_or(rv);
 		return *this;
@@ -190,7 +181,6 @@ public:
 		return result;
 	}
 
-	// xor
 	constexpr BigInt& operator^=(const BigInt& rv) {
 		bitwise_xor(rv);
 		return *this;
@@ -202,7 +192,7 @@ public:
 		return result;
 	}
 
-	// Shift left
+	// Shift left.
 	constexpr BigInt& operator<<=(const size_t shift) {
 		shift_left(shift);
 		return *this;
@@ -331,14 +321,21 @@ public:
 		return *this;
 	}
 
-	// TODO:
 	constexpr BigInt operator%(const BigInt& rv) const {
 		BigInt result(*this);
+		BigInt result_div;
+		result.div(rv, result_div);
 		return result;
 	}
 
 	constexpr BigInt& operator%=(const BigInt& rv) {
+		BigInt result_div;
+		div(rv, result_div);
 		return *this;
+	}
+
+	constexpr bool msbit() const {
+		return _number[WIDTH_CHUNKS - 1] & MSBIT_MASK;
 	}
 
 private:
@@ -360,10 +357,7 @@ private:
 		size_t idx = 0;
 		while((idx < WIDTH_CHUNKS) && (val != 0)) {
 			_number[idx++] = val & CHUNK_MASK;
-			val >>= (sizeof(UChunk) * CHAR_BIT);
-		}
-		while(idx < WIDTH_CHUNKS) {
-			_number[idx++] = 0;
+			val >>= CHUNK_WIDTH_BITS;
 		}
 	}
 
@@ -371,10 +365,6 @@ private:
 	constexpr void load_integer_unsigned(const T val) {
 		size_t idx = 0;
 		_number[idx++] = val;
-
-		while(idx < WIDTH_CHUNKS) {
-			_number[idx++] = 0;
-		}
 	}
 
 	// Store integers.
@@ -396,7 +386,7 @@ private:
 		size_t idx = std::min(WIDTH_CHUNKS, CHUNKS_RATIO) - 1u;
 		val = 0;
 		while(idx < WIDTH_CHUNKS) {
-			val <<= sizeof(UChunk) * CHAR_BIT;
+			val <<= CHUNK_WIDTH_BITS;
 			val |= _number[idx--] & CHUNK_MASK;
 		}
 	}
@@ -405,7 +395,6 @@ private:
 	constexpr void store_integer_unsigned(T& val) const {
 		val = _number[0];
 	}
-
 
 	// Load BigInt.
 	template <typename C, size_t W>
@@ -480,7 +469,6 @@ private:
 		}
 	}
 	
-
 	// Bitwise operators.
 	constexpr void bitwise_not() {
 		for(auto& chunk : _number) {
@@ -650,7 +638,8 @@ private:
 	}
 
 	constexpr void div(const BigInt& rv, BigInt& result_div) {
-		const bool is_msbit = msbit() ^ rv.msbit();
+		const bool mod_msbit = msbit();
+		const bool div_msbit = msbit() ^ rv.msbit();
 		if(msbit()) {
 			sign_flip();
 		}
@@ -659,7 +648,10 @@ private:
 			denom.sign_flip();
 		}
 		div_unsigned(denom, result_div);
-		if(is_msbit){
+		if(mod_msbit){
+			sign_flip();
+		}
+		if(div_msbit){
 			result_div.sign_flip();
 		}
 	}
@@ -668,56 +660,47 @@ private:
 		BigInt num(*this);
 		BigInt result;
 
-		const size_t num_idx_hd_start = num.most_valuable_half_chunk_idx();
-		const size_t denom_idx_hd_start = denom.most_valuable_half_chunk_idx();
+		const size_t num_idx_hlf_start = num.most_valuable_half_chunks_idx();
+		const size_t denom_idx_hlf_start = denom.most_valuable_half_chunks_idx();
 		bool carry = false;
 
-		++_tmp_call_cnt; // TODO:
-
-		if(num_idx_hd_start >= denom_idx_hd_start) {
-			size_t shift_hd = num_idx_hd_start - denom_idx_hd_start;
-			size_t idx_hd = num_idx_hd_start;
+		if(num_idx_hlf_start >= denom_idx_hlf_start) {
+			size_t shift_hd = num_idx_hlf_start - denom_idx_hlf_start;
+			size_t idx_hlf = num_idx_hlf_start;
 			denom.shift_left(shift_hd * HALF_CHUNK_WIDTH_BITS);
 
 			while(shift_hd < HALF_WIDTH_CHUNKS) {
-
 				if(carry) {
-					const size_t idx_hd_prev = idx_hd + 1u;
+					const size_t idx_hlf_prev = idx_hlf + 1u;
 
-					while(num.half_chunk(idx_hd_prev)) {
-						const UChunk div_floor = num.full_chunk(idx_hd_prev) / (denom.half_chunk(idx_hd) + 1u);
-
+					while(num.half_chunk(idx_hlf_prev)) {
+						const UChunk div_floor = num.full_chunk(idx_hlf_prev) / (denom.half_chunk(idx_hlf) + 1u);
 						BigInt mult_result = denom;
 						mult_result.mult_chunk(div_floor);
-						result.chunk_add(div_floor);
+						result.chunk_add_offset(div_floor, 0);
 						num -= mult_result;
-
-						++_tmp_carry_mult_cnt; // TODO:
 					}
 					carry = false;
 				}
 
-				if(num.half_chunk(idx_hd)){
-					const UChunk num_full_chunk = num.full_chunk(idx_hd);
-					const UChunk denom_full_chunk = denom.full_chunk(idx_hd);
+				if(num.half_chunk(idx_hlf)){
+					const UChunk num_full_chunk = num.full_chunk(idx_hlf);
+					const UChunk denom_full_chunk = denom.full_chunk(idx_hlf);
 
 					if(num_full_chunk > denom_full_chunk) {
 						const UChunk div_floor = num_full_chunk / (denom_full_chunk + 1u);
 						BigInt mult_result = denom;
 						mult_result.mult_chunk(div_floor);
-						result.chunk_add(div_floor);
+						result.chunk_add_offset(div_floor, 0);
 						num -= mult_result;
-
-						++_tmp_mult_cnt; // TODO:
 					}
 
 					while(not num.abs_val_less(denom)) {
 						num -= denom;
-						result.chunk_add(1u);
-						++_tmp_sub_cnt; // TODO:
+						result.chunk_add_offset(1u, 0);
 					}
 
-					carry = num.half_chunk(idx_hd);
+					carry = num.half_chunk(idx_hlf);
 				}
 
 				if(shift_hd) {
@@ -725,22 +708,13 @@ private:
 					denom.shift_right_unsigned(HALF_CHUNK_WIDTH_BITS);
 				}
 				--shift_hd;
-				--idx_hd;
+				--idx_hlf;
 			}
 
 		}
 		result_div = result;
+		*this = num;
 	}
-
-//	static void dump(const char* point, const size_t idx_hd, const BigInt& num, const BigInt& denom, const BigInt& result, bool carry) {
-//		printf("[%s] idx_hd=%zu %s\n", point, idx_hd, carry ? "+carry" : "");
-//		printf("num    ");
-//		hex(num);
-//		printf("denom  ");
-//		hex(denom);
-//		printf("result ");
-//		hex(result);
-//	}
 
 
 	// ----------------------------------------------------------------------------
@@ -748,15 +722,15 @@ private:
 	// ----------------------------------------------------------------------------
 
 	// Half chunk getters.
-	constexpr UChunk half_chunk(const size_t idx_hd) const {
-		UChunk result = _number[idx_hd / 2u];
-		return ((idx_hd % 2u) == 0) ? (result & HALF_CHUNK_LOW_MASK) : (result >> HALF_CHUNK_WIDTH_BITS);
+	constexpr UChunk half_chunk(const size_t idx_hlf) const {
+		UChunk result = _number[idx_hlf / 2u];
+		return ((idx_hlf % 2u) == 0) ? (result & HALF_CHUNK_LOW_MASK) : (result >> HALF_CHUNK_WIDTH_BITS);
 	}
 
-	constexpr UChunk full_chunk(const size_t idx_hd) const {
-		const size_t idx = idx_hd / 2u;
+	constexpr UChunk full_chunk(const size_t idx_hlf) const {
+		const size_t idx = idx_hlf / 2u;
 		UChunk result = _number[idx];
-		if((idx_hd % 2u) == 0) {
+		if((idx_hlf % 2u) == 0) {
 			result <<= HALF_CHUNK_WIDTH_BITS;
 			if(idx) {
 				result |= (_number[idx-1] >> HALF_CHUNK_WIDTH_BITS);
@@ -765,19 +739,6 @@ private:
 		return result;
 	}
 
-
-	constexpr UChunk chunk_add(const UChunk& ch) {
-		_number[0] += ch;
-		UChunk carry = (_number[0] < ch);
-
-		size_t idx = 1u;
-		while(carry && (idx < WIDTH_CHUNKS)) {
-			_number[idx] += carry;
-			carry = (_number[idx] < carry);
-			++idx;
-		}
-		return carry;
-	}
 
 	constexpr UChunk chunk_add_offset(const UChunk& ch, size_t idx) {
 		_number[idx] += ch;
@@ -805,7 +766,7 @@ private:
 		return result;
 	}
 
-	constexpr size_t most_valuable_half_chunk_idx() const {
+	constexpr size_t most_valuable_half_chunks_idx() const {
 		size_t result = 0;
 		size_t idx = WIDTH_CHUNKS - 1;
 		while(idx < WIDTH_CHUNKS) {
@@ -844,15 +805,7 @@ private:
 
 	constexpr void sign_flip() {
 		bitwise_not();
-		chunk_add(1);
-	}
-
-	constexpr bool msbit() const {
-		return _number[WIDTH_CHUNKS - 1] & MSBIT_MASK;
-	}
-
-	const UChunk& operator[](const size_t idx) const {
-		return _number[idx];
+		chunk_add_offset(1, 0);
 	}
 
 };
