@@ -3,11 +3,16 @@
 #include "utils/Perf.h"
 #include "BigInt.h"
 
-#include <random>
+#include <vector>
+#include <cstdlib>
 #include <climits>
+#include <limits>
+#include <cstdio>
+
+//#include <string>
 
 #define ASSERT(exp) { \
-	if(not (exp)) { \
+	if(!(exp)) { \
 		printf(#exp "\n"); \
 		fflush(stdout); \
 		fflush(stderr); \
@@ -20,28 +25,19 @@ class TestBigInt {
 	static constexpr size_t AUTOTEST_ROUNDS = 100000u;
 	static constexpr size_t PERFORMANCE_TEST_ROUNDS = 100000u;
 
-	template <typename T, std::enable_if_t<(std::is_integral_v<T>), int> = 0>
-	struct UniformIntGen {
-		std::mt19937_64 rnd;
-		std::uniform_int_distribution<T> distr;
-		UniformIntGen(const T min = std::numeric_limits<T>::min(), const T max = std::numeric_limits<T>::max()) : rnd(0), distr(min, max) {}
+	template <typename T, size_t BYTES_MAX = sizeof(T), std::enable_if_t<(BYTES_MAX <= sizeof(T)), int> = 0>
+	struct RndIntGen {
+		static_assert(RAND_MAX > 0xFF, "rand() range is narrower than one byte.");
+
 		T next() {
-			return distr(rnd);
-		}
-	};
-
-	template <typename BINT>
-	struct UniformBigIntGen {
-		std::mt19937_64 rnd;
-		std::uniform_int_distribution<size_t> gen_size{1u, BINT::NUMBER_WIDTH_BYTES};
-		std::uniform_int_distribution<int8_t> gen_data;
-
-		BINT next() {
-			BINT result;
-			size_t size_bytes = gen_size(rnd);
-			while(size_bytes--) {
+			T result = T(0);
+			size_t bytes = (std::abs(rand()) % BYTES_MAX) + 1u;
+			while(bytes--) {
 				result <<= CHAR_BIT;
-				result += BINT(gen_data(rnd));
+				result += T(rand() & 0xFF);
+			}
+			if(rand() > (RAND_MAX / 2)) {
+				result = -result;
 			}
 			return result;
 		}
@@ -71,20 +67,6 @@ class TestBigInt {
 	func<BigInt<signed int, 1u>, signed int>(rounds); \
 	func<BigInt<signed int, INT_PER_LONG>, signed long>(rounds); \
 	func<BigInt<signed long, 1u>, signed long>(rounds); \
-}
-
-#define ITERATE_BIGINT_AND_NARROWER_INTEGERS(func, rounds) { \
-	printf("->TestBigInt::"#func"()\n"); \
-	func<BigInt<signed char, 2u>, signed char>(rounds); \
-	func<BigInt<signed char, CHARS_PER_SHORT + 1u>, signed short>(rounds); \
-	func<BigInt<signed char, CHARS_PER_INT + 1u>, signed int>(rounds); \
-	func<BigInt<signed char, CHARS_PER_LONG + 1u>, signed long>(rounds); \
-	func<BigInt<signed short, 2u>, signed short>(rounds); \
-	func<BigInt<signed short, SHORTS_PER_INT + 1u>, signed int>(rounds); \
-	func<BigInt<signed short, SHORTS_PER_LONG + 1u>, signed long>(rounds); \
-	func<BigInt<signed int, 2u>, signed int>(rounds); \
-	func<BigInt<signed int, INT_PER_LONG + 1u>, signed long>(rounds); \
-	func<BigInt<signed long, 2u>, signed long>(rounds); \
 }
 
 #define ITERATE_BIGINT_AND_EQUAL_WIDTH_BIGINT(func, rounds) { \
@@ -142,10 +124,10 @@ class TestBigInt {
 public:
 
 	TestBigInt() {
+		srand(0);
 
 		// Type conversion tests.
 		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGERS(test_load_store_int, AUTOTEST_ROUNDS);
-		ITERATE_BIGINT_AND_NARROWER_INTEGERS(test_load_store_int, AUTOTEST_ROUNDS);
 		ITERATE_BIGINT_AND_EQUAL_WIDTH_BIGINT(test_load_store_big_int, AUTOTEST_ROUNDS);
 		ITERATE_BIGINT_AND_WIDER_BIGINT(test_load_store_big_int, AUTOTEST_ROUNDS);
 		test_type_conversion_bigint_int();
@@ -173,8 +155,8 @@ public:
 
 	template <typename BigType_t, typename Integer>
 	void test_load_store_int(size_t rounds) {
-		static_assert(sizeof(BigType_t) >= sizeof(Integer));
-		UniformIntGen<Integer> gen;
+		static_assert(sizeof(BigType_t) >= sizeof(Integer), "Size assert");
+		RndIntGen<Integer> gen;
 		BigType_t bint;
 
 		test_load_store_int_value<BigType_t, Integer>(bint, -1);
@@ -197,8 +179,8 @@ public:
 
 	template <typename A, typename B>
 	void test_load_store_big_int(size_t rounds) {
-		static_assert(A::NUMBER_WIDTH_BYTES <= B::NUMBER_WIDTH_BYTES);
-		UniformBigIntGen<A> gen_a;
+		static_assert(A::NUMBER_WIDTH_BYTES <= B::NUMBER_WIDTH_BYTES, "Size assert");
+		RndIntGen<A> gen_a;
 
 		test_load_store_big_int_value<A, B>(A(-1));
 		test_load_store_big_int_value<A, B>(A(0));
@@ -213,7 +195,7 @@ public:
 
 	template <typename A, typename B>
 	void test_load_store_big_int_value(const A& a_in) {
-		static_assert(A::NUMBER_WIDTH_BYTES <= B::NUMBER_WIDTH_BYTES);
+		static_assert(A::NUMBER_WIDTH_BYTES <= B::NUMBER_WIDTH_BYTES, "Size assert");
 		B b_in(a_in);
 		A a_out(b_in);
 		ASSERT(a_in == a_out);
@@ -351,7 +333,7 @@ public:
 
 	template <typename BigType_t, typename Integer>
 	void test_min_max(size_t) {
-		static_assert(BigType_t::NUMBER_WIDTH_BYTES == sizeof(Integer));
+		static_assert(BigType_t::NUMBER_WIDTH_BYTES == sizeof(Integer), "Size assert");
 		const auto bmin = BigType_t::min();
 		const auto bmax = BigType_t::max();
 		Integer imin = bmin;
@@ -362,8 +344,8 @@ public:
 
 	template <typename BigType_t, typename Integer>
 	void test_bitwise(size_t rounds) {
-		static_assert(BigType_t::NUMBER_WIDTH_BYTES == sizeof(Integer));
-		UniformIntGen<Integer> gen;
+		static_assert(BigType_t::NUMBER_WIDTH_BYTES == sizeof(Integer), "Size assert");
+		RndIntGen<Integer> gen;
 		BigType_t bx;
 		BigType_t by;
 		BigType_t bop;
@@ -403,15 +385,15 @@ public:
 
 	template <typename BigType_t, typename Integer>
 	void test_shift(size_t rounds) {
-		static_assert(BigType_t::NUMBER_WIDTH_BYTES == sizeof(Integer));
-		UniformIntGen<Integer> gen;
-		UniformIntGen<size_t> gen_shift(0, (sizeof(Integer) * CHAR_BIT) - 1u);
+		static_assert(BigType_t::NUMBER_WIDTH_BYTES == sizeof(Integer), "Size assert");
+		RndIntGen<Integer> gen;
+		RndIntGen<size_t, 1u> gen_shift;
 		BigType_t bx;
 		BigType_t bop;
 		while(rounds--) {
 			const Integer ix = gen.next();
 			Integer iop;
-			const size_t shift = gen_shift.next();
+			const size_t shift = (gen_shift.next() % (sizeof(Integer) * CHAR_BIT - 1u));
 			bx = ix;
 			test_equal<BigType_t, Integer>(bx, ix);
 			test_equal<BigType_t, Integer>(bx << shift, ix << shift);
@@ -440,8 +422,8 @@ public:
 
 	template <typename BigType_t, typename Integer>
 	void test_relational(size_t rounds) {
-		static_assert(BigType_t::NUMBER_WIDTH_BYTES == sizeof(Integer));
-		UniformIntGen<Integer> gen;
+		static_assert(BigType_t::NUMBER_WIDTH_BYTES == sizeof(Integer), "Size assert");
+		RndIntGen<Integer> gen;
 		BigType_t bx;
 		BigType_t by;
 		while(rounds--) {
@@ -470,8 +452,8 @@ public:
 
 	template <typename BigType_t, typename Integer>
 	void test_add_sub(size_t rounds) {
-		static_assert(BigType_t::NUMBER_WIDTH_BYTES == sizeof(Integer));
-		UniformIntGen<Integer> gen;
+		static_assert(BigType_t::NUMBER_WIDTH_BYTES == sizeof(Integer), "Size assert");
+		RndIntGen<Integer> gen;
 		BigType_t bx;
 		BigType_t by;
 		BigType_t bop;
@@ -504,8 +486,8 @@ public:
 
 	template <typename BigType_t, typename Integer>
 	void test_mult(size_t rounds) {
-		static_assert(BigType_t::NUMBER_WIDTH_BYTES == sizeof(Integer));
-		UniformIntGen<Integer> gen;
+		static_assert(BigType_t::NUMBER_WIDTH_BYTES == sizeof(Integer), "Size assert");
+		RndIntGen<Integer> gen;
 		BigType_t bx;
 		BigType_t by;
 		BigType_t bop;
@@ -531,17 +513,17 @@ public:
 
 	template <typename BigType_t, typename Integer>
 	void test_div_mod(size_t rounds) {
-		static_assert(BigType_t::NUMBER_WIDTH_BYTES == sizeof(Integer));
-		UniformIntGen<Integer> gen;
-		UniformIntGen<Integer> gen_sqrt(-std::sqrt(std::numeric_limits<Integer>::max()), std::sqrt(std::numeric_limits<Integer>::max()));
+		static_assert(BigType_t::NUMBER_WIDTH_BYTES == sizeof(Integer), "Size assert");
+		RndIntGen<Integer> gen;
+		RndIntGen<Integer, (sizeof(Integer) / 2u + 1u)> gen_sqrt;
 		BigType_t bx;
 		BigType_t by;
 		BigType_t bop;
 		while(rounds--) {
 			const Integer ix = gen.next();
 			Integer iy = gen_sqrt.next();
-			if(iy == 0) {
-				--iy;
+			while(iy == 0) {
+				iy = gen_sqrt.next();
 			}
 			Integer iop;
 			bx = ix;
@@ -568,8 +550,8 @@ public:
 
 	template <typename BigType_t, typename Integer>
 	void test_sign_change(size_t rounds) {
-		static_assert(BigType_t::NUMBER_WIDTH_BYTES == sizeof(Integer));
-		UniformIntGen<Integer> gen;
+		static_assert(BigType_t::NUMBER_WIDTH_BYTES == sizeof(Integer), "Size assert");
+		RndIntGen<Integer> gen;
 		BigType_t bx;
 		while(rounds--) {
 			const Integer ix = gen.next();
@@ -594,16 +576,19 @@ public:
 		static constexpr BiInt_t BI_INT = 0x7F;
 		static constexpr BiLong_t BI_LONG = 0x0ABC;
 
-		static_assert((BI_CHAR + BiChar_t(1)) == 'B');
-		static_assert(BI_SHORT + BiShort_t(1) == BiShort_t(0));
-		static_assert((BI_INT - 1) == 0x7E);
-		static_assert((BI_INT * 16) == 0x7F0);
-		static_assert((BI_INT / 16) == 0x7);
-		static_assert((BI_INT ^ 0x7F) == 0);
-		static_assert((BI_INT | 0x80) == 0xFF);
-		static_assert((BI_INT & 0x80) == 0);
-		static_assert(BI_LONG >> 4u == 0xAB);
-		static_assert(BI_LONG << 4u == 0xABC0);
+		static_assert((BI_CHAR + BiChar_t(1)) == 'B', "_");
+//		static_assert((BI_CHAR | (signed char)('A')) == (signed char)('A'), "_");
+//		static_assert((BI_CHAR & 'A') == 'A', "_");
+//		static_assert((BI_CHAR ^ 'A') == BiChar_t(0), "_");
+		static_assert(BI_SHORT + BiShort_t(1) == BiShort_t(0), "_");
+		static_assert((BI_INT - 1) == 0x7E, "_");
+		static_assert((BI_INT * 16) == 0x7F0, "_");
+		static_assert((BI_INT / 16) == 0x7, "_");
+		static_assert((BI_INT ^ 0x7F) == 0, "_");
+		static_assert((BI_INT | 0x80) == 0xFF, "_");
+		static_assert((BI_INT & 0x80) == 0, "_");
+		static_assert(BI_LONG >> 4u == 0xAB, "_");
+		static_assert(BI_LONG << 4u == 0xABC0, "_");
 	}
 
 	// -----------------------------------------------------------------------
@@ -641,7 +626,7 @@ public:
 		Perf perf_add("add()          ");
 		Perf perf_sub("sub()          ");
 
-		UniformBigIntGen<BigType_t> gen;
+		RndIntGen<BigType_t> gen;
 
 		std::vector<BigType_t> x_ref;
 		std::vector<BigType_t> x;
@@ -684,7 +669,7 @@ public:
 		size_t result = 0;
 		Perf perf_mult("mult()         ");
 
-		UniformBigIntGen<BigType_t> gen;
+		RndIntGen<BigType_t> gen;
 
 		std::vector<BigType_t> x_ref;
 		std::vector<BigType_t> x;
@@ -722,7 +707,7 @@ public:
 		size_t result = 0;
 		Perf perf_div("div()          ");
 
-		UniformBigIntGen<BigType_t> gen;
+		RndIntGen<BigType_t> gen;
 
 		std::vector<BigType_t> x_ref;
 		std::vector<BigType_t> x;

@@ -1,8 +1,8 @@
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
 #include <type_traits>
-#include <string>
-#include <array>
 #include <climits>
 
 /**
@@ -27,8 +27,8 @@
 template <typename Chunk, size_t WIDTH_CHUNKS>
 class BigInt {
 
-	static_assert(std::is_integral_v<Chunk>, "BigInt: Chunk type MUST BE an integral type!");
-	static_assert(std::is_signed_v<Chunk>, "BigInt: Chunk type MUST BE signed!");
+	static_assert(std::is_integral<Chunk>::value, "BigInt: Chunk type MUST BE an integral type!");
+	static_assert(std::is_signed<Chunk>::value, "BigInt: Chunk type MUST BE signed!");
 	static_assert(WIDTH_CHUNKS > 0, "BigInt: WIDTH_CHUNKS is zero!");
 	static_assert(WIDTH_CHUNKS <= (SIZE_MAX / 2u), "BigInt: WIDTH_CHUNKS exceeds the threshold!");
 
@@ -37,7 +37,7 @@ class BigInt {
 
 public:
 
-	using UChunk = std::make_unsigned_t<Chunk>;
+	using UChunk = typename std::make_unsigned<Chunk>::type;
 
 	static constexpr size_t CHUNK_WIDTH_BYTES = sizeof(UChunk);
 	static constexpr size_t CHUNK_WIDTH_BITS = CHUNK_WIDTH_BYTES * CHAR_BIT;
@@ -54,7 +54,7 @@ public:
 
 protected:
 
-	using Number_t = std::array<UChunk, WIDTH_CHUNKS>;
+	using Number_t = UChunk[WIDTH_CHUNKS];
 	Number_t _number;
 
 public:
@@ -70,25 +70,25 @@ public:
 	BigInt& operator=(BigInt&& rv) = default;
 
 	// From not wider integer. Implicit conversion.
-	template <typename T, std::enable_if_t<(std::is_integral_v<T> && std::is_signed_v<T> && sizeof(T) <= NUMBER_WIDTH_BYTES), int> = 0>
+	template <typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= NUMBER_WIDTH_BYTES), int>::type = 0>
 	constexpr BigInt(const T& init) : _number{0} {
 		load_integer(init);
 	}
 
 	// From wider integer. Explicit conversion is needed.
-	template <typename T, std::enable_if_t<(std::is_integral_v<T> && std::is_signed_v<T> && sizeof(T) > NUMBER_WIDTH_BYTES), int> = 0>
+	template <typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) > NUMBER_WIDTH_BYTES), int>::type = 0>
 	constexpr explicit BigInt(const T& init) : _number{0} {
 		load_integer(init);
 	}
 
 	// From not wider BigInt. Implicit conversion.
-	template <typename C, size_t W, std::enable_if_t<((sizeof(C) * W) <= NUMBER_WIDTH_BYTES), int> = 0>
+	template <typename C, size_t W, typename std::enable_if<((sizeof(C) * W) <= NUMBER_WIDTH_BYTES), int>::type = 0>
 	constexpr BigInt(const BigInt<C, W>& rv) : _number{0}{
 		load_big_int(rv);
 	}
 
 	// From wider BigInt. Explicit conversion is needed.
-	template <typename C, size_t W, std::enable_if_t<((sizeof(C) * W) > NUMBER_WIDTH_BYTES), int> = 0>
+	template <typename C, size_t W, typename std::enable_if<((sizeof(C) * W) > NUMBER_WIDTH_BYTES), int>::type = 0>
 	constexpr explicit BigInt(const BigInt<C, W>& rv) : _number{0}{
 		load_big_int(rv);
 	}
@@ -97,7 +97,7 @@ public:
 	// Copying operators.
 	// ----------------------------------------------------------------------------
 	// From not wider integer.
-	template <typename T, std::enable_if_t<(std::is_integral_v<T> && std::is_signed_v<T> && sizeof(T) <= NUMBER_WIDTH_BYTES), int> = 0>
+	template <typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= NUMBER_WIDTH_BYTES), int>::type = 0>
 	constexpr BigInt& operator=(const T& init) {
 		size_t idx = 0;
 		while(idx < WIDTH_CHUNKS) {
@@ -108,7 +108,7 @@ public:
 	}
 
 	// From not wider BigInt.
-	template <typename C, size_t W, std::enable_if_t<((sizeof(C) * W) <= NUMBER_WIDTH_BYTES), int> = 0>
+	template <typename C, size_t W, typename std::enable_if<((sizeof(C) * W) <= NUMBER_WIDTH_BYTES), int>::type = 0>
 	constexpr BigInt& operator=(const BigInt<C, W>& rv) {
 		load_big_int(rv);
 		return *this;
@@ -136,14 +136,14 @@ public:
 	// ----------------------------------------------------------------------------
 	// Type conversion.
 	// ----------------------------------------------------------------------------
-	template <typename T, std::enable_if_t<(std::is_integral_v<T> && std::is_signed_v<T> && sizeof(T) >= NUMBER_WIDTH_BYTES), int> = 0>
+	template <typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) >= NUMBER_WIDTH_BYTES), int>::type = 0>
 	constexpr operator T() const {
 		T result;
 		store_integer(result);
 		return result;
 	}
 
-	template <typename T, std::enable_if_t<(std::is_integral_v<T> && std::is_signed_v<T> && sizeof(T) < NUMBER_WIDTH_BYTES), int> = 0>
+	template <typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) < NUMBER_WIDTH_BYTES), int>::type = 0>
 	constexpr explicit operator T() const {
 		T result;
 		store_integer(result);
@@ -341,18 +341,18 @@ public:
 private:
 
 	// Load integers.
-	template <typename T, std::enable_if_t<(std::is_integral_v<T> && std::is_signed_v<T>), int> = 0>
+	template <typename T>
 	constexpr void load_integer(T val) {
 		if(val < 0) {
 			val = ~val;
-			load_integer_unsigned(static_cast<std::make_unsigned_t<T>>(val));
+			load_integer_unsigned(static_cast<typename std::make_unsigned<T>::type>(val));
 			bitwise_not();
 		} else {
-			load_integer_unsigned(static_cast<std::make_unsigned_t<T>>(val));
+			load_integer_unsigned(static_cast<typename std::make_unsigned<T>::type>(val));
 		}
 	}
 
-	template <typename T, std::enable_if_t<(std::is_integral_v<T> && std::is_unsigned_v<T> && (sizeof(T) > sizeof(UChunk))), int> = 0>
+	template <typename T, typename std::enable_if<(sizeof(T) > sizeof(UChunk)), int>::type = 0>
 	constexpr void load_integer_unsigned(T val) {
 		size_t idx = 0;
 		while((idx < WIDTH_CHUNKS) && (val != 0)) {
@@ -361,29 +361,29 @@ private:
 		}
 	}
 
-	template <typename T, std::enable_if_t<(std::is_integral_v<T> && std::is_unsigned_v<T> && (sizeof(T) <= sizeof(UChunk))), int> = 0>
+	template <typename T, typename std::enable_if<(sizeof(T) <= sizeof(UChunk)), int>::type = 0>
 	constexpr void load_integer_unsigned(const T val) {
 		size_t idx = 0;
 		_number[idx++] = val;
 	}
 
 	// Store integers.
-	template <typename T, std::enable_if_t<(std::is_integral_v<T> && std::is_signed_v<T>), int> = 0>
+	template <typename T>
 	constexpr void store_integer(T& val) const {
 		if(msbit()) {
 			BigInt tmp(*this);
 			tmp.bitwise_not();
-			tmp.store_integer_unsigned(reinterpret_cast<std::make_unsigned_t<T>&>(val));
+			tmp.store_integer_unsigned(reinterpret_cast<typename std::make_unsigned<T>::type&>(val));
 			val = ~val;
 		} else {
-			store_integer_unsigned(reinterpret_cast<std::make_unsigned_t<T>&>(val));
+			store_integer_unsigned(reinterpret_cast<typename std::make_unsigned<T>::type&>(val));
 		}
 	}
 
-	template <typename T, std::enable_if_t<(std::is_integral_v<T> && std::is_unsigned_v<T> && (sizeof(T) > sizeof(UChunk))), int> = 0>
+	template <typename T, typename std::enable_if<(sizeof(T) > sizeof(UChunk)), int>::type = 0>
 	constexpr void store_integer_unsigned(T& val) const {
 		constexpr size_t CHUNKS_RATIO = sizeof(T) / sizeof(UChunk);
-		size_t idx = std::min(WIDTH_CHUNKS, CHUNKS_RATIO) - 1u;
+		size_t idx = ((WIDTH_CHUNKS < CHUNKS_RATIO) ? WIDTH_CHUNKS : CHUNKS_RATIO) - 1u;
 		val = 0;
 		while(idx < WIDTH_CHUNKS) {
 			val <<= CHUNK_WIDTH_BITS;
@@ -391,7 +391,7 @@ private:
 		}
 	}
 
-	template <typename T, std::enable_if_t<(std::is_integral_v<T> && std::is_unsigned_v<T> && (sizeof(T) <= sizeof(UChunk))), int> = 0>
+	template <typename T, typename std::enable_if<(sizeof(T) <= sizeof(UChunk)), int>::type = 0>
 	constexpr void store_integer_unsigned(T& val) const {
 		val = _number[0];
 	}
@@ -409,7 +409,7 @@ private:
 		}
 	}
 
-	template <typename C, size_t W, std::enable_if_t<(sizeof(C) < sizeof(UChunk)), int> = 0>
+	template <typename C, size_t W, typename std::enable_if<(sizeof(C) < sizeof(UChunk)), int>::type = 0>
 	constexpr void load_big_int_unsigned(BigInt<C, W> rv) {
 		static_assert((sizeof(UChunk) % (sizeof(C))) == 0);
 		constexpr size_t CHUNKS_RATIO = sizeof(UChunk) / sizeof(C);
@@ -434,7 +434,7 @@ private:
 
 	}
 
-	template <typename C, size_t W, std::enable_if_t<(sizeof(C) > sizeof(UChunk)), int> = 0>
+	template <typename C, size_t W, typename std::enable_if<(sizeof(C) > sizeof(UChunk)), int>::type = 0>
 	constexpr void load_big_int_unsigned(BigInt<C, W> rv) {
 		static_assert((sizeof(C) % sizeof(UChunk)) == 0);
 
@@ -455,9 +455,9 @@ private:
 		}
 	}
 
-	template <typename C, size_t W, std::enable_if_t<(sizeof(C) == sizeof(UChunk)), int> = 0>
+	template <typename C, size_t W, typename std::enable_if<(sizeof(C) == sizeof(UChunk)), int>::type = 0>
 	constexpr void load_big_int_unsigned(BigInt<C, W> bi) {
-		const size_t width = std::min(W, WIDTH_CHUNKS);
+		const size_t width = ((W < WIDTH_CHUNKS) ? W : WIDTH_CHUNKS);
 
 		size_t idx = 0;
 		while(idx < width) {
@@ -495,7 +495,7 @@ private:
 	}
 
 	constexpr void shift_left(size_t shift_bits) {
-		shift_bits = std::min(shift_bits, NUMBER_WIDTH_BITS);
+		shift_bits = (shift_bits < NUMBER_WIDTH_BITS) ? shift_bits : NUMBER_WIDTH_BITS;
 		const size_t shift_chunks = shift_bits / CHUNK_WIDTH_BITS;
 		
 		// Shifting chunks.
@@ -537,7 +537,7 @@ private:
 	}
 
 	constexpr void shift_right_unsigned(size_t shift_bits) {
-		shift_bits = std::min(shift_bits, NUMBER_WIDTH_BITS);
+		shift_bits = (shift_bits < NUMBER_WIDTH_BITS) ? shift_bits : NUMBER_WIDTH_BITS;
 		const size_t shift_chunks = shift_bits / CHUNK_WIDTH_BITS;
 
 		// Shifting chunks.
