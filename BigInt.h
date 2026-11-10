@@ -6,8 +6,7 @@
 #include <climits>
 
 /**
- * @tparam Chunk Any signed integral type.
- * @tparam WIDTH_CHUNKS
+ * @tparam WIDTH_BITS
  *
  * The BigInt is a signed, fixed-size, static stored integer arithmetic template.
  * The integer value is stored in two's complement code as an array of chunks (or limbs if you prefer GMP terminology).
@@ -24,43 +23,46 @@
  *  The most significant bit.                                                  The least significant bit.
  *
  */
-template <typename Chunk, size_t WIDTH_CHUNKS>
-class BigInt {
+template <size_t WIDTH_BITS>
+struct BigInt {
 
-	static_assert(std::is_integral<Chunk>::value, "BigInt: Chunk type MUST BE an integral type!");
-	static_assert(std::is_signed<Chunk>::value, "BigInt: Chunk type MUST BE signed!");
-	static_assert(WIDTH_CHUNKS > 0, "BigInt: WIDTH_CHUNKS is zero!");
-	static_assert(WIDTH_CHUNKS <= (SIZE_MAX / 2u), "BigInt: WIDTH_CHUNKS exceeds the threshold!");
+	static_assert(WIDTH_BITS > 0, "BigInt: WIDTH_BITS must be greater than zero!");
+	static_assert((WIDTH_BITS % CHAR_BIT) == 0, "BigInt: WIDTH_BITS must be a multiple of CHAR_BIT!");
 
-	template <typename C, size_t W>
-	friend class BigInt;
+	template <size_t W>
+	friend struct BigInt;
 
-public:
+	static constexpr size_t NUMBER_WIDTH_BITS = WIDTH_BITS;
+	static constexpr size_t NUMBER_WIDTH_BYTES = NUMBER_WIDTH_BITS / CHAR_BIT;
 
-	using UChunk = typename std::make_unsigned<Chunk>::type;
+	using UChunk =
+		typename std::conditional<((NUMBER_WIDTH_BYTES % sizeof(unsigned long long)) == 0), unsigned long long,
+			typename std::conditional<((NUMBER_WIDTH_BYTES % sizeof(unsigned long)) == 0), unsigned long,
+				typename std::conditional<((NUMBER_WIDTH_BYTES % sizeof(unsigned int)) == 0), unsigned int,
+					typename std::conditional<((NUMBER_WIDTH_BYTES % sizeof(unsigned short)) == 0), unsigned short,
+						typename std::conditional<((NUMBER_WIDTH_BYTES % sizeof(unsigned char)) == 0), unsigned char, void>::type
+				    >::type
+				>::type
+			>::type
+		>::type;
 
 	static constexpr size_t CHUNK_WIDTH_BYTES = sizeof(UChunk);
 	static constexpr size_t CHUNK_WIDTH_BITS = CHUNK_WIDTH_BYTES * CHAR_BIT;
-	static constexpr size_t HALF_WIDTH_CHUNKS = WIDTH_CHUNKS * 2u;
+	static constexpr size_t NUMBER_WIDTH_CHUNKS = NUMBER_WIDTH_BYTES / CHUNK_WIDTH_BYTES;
+	static constexpr size_t HALF_WIDTH_CHUNKS = NUMBER_WIDTH_CHUNKS * 2u;
 	static constexpr size_t HALF_CHUNK_WIDTH_BITS = CHUNK_WIDTH_BITS / 2u;
-	static constexpr size_t NUMBER_WIDTH_CHUNKS = WIDTH_CHUNKS;
-	static constexpr size_t NUMBER_WIDTH_BYTES = CHUNK_WIDTH_BYTES * WIDTH_CHUNKS;
-	static constexpr size_t NUMBER_WIDTH_BITS = CHUNK_WIDTH_BITS * WIDTH_CHUNKS;
 	
 	static constexpr UChunk CHUNK_MASK = ~UChunk(0);
 	static constexpr UChunk HALF_CHUNK_LOW_MASK = UChunk(CHUNK_MASK >> HALF_CHUNK_WIDTH_BITS);
 	static constexpr UChunk HALF_CHUNK_HIGH_MASK = UChunk(CHUNK_MASK << HALF_CHUNK_WIDTH_BITS);
 	static constexpr UChunk MSBIT_MASK = UChunk(CHUNK_MASK << (CHUNK_WIDTH_BITS - 1u));
 
-protected:
+	using Number_t = UChunk[NUMBER_WIDTH_CHUNKS];
 
-	using Number_t = UChunk[WIDTH_CHUNKS];
 	Number_t _number;
 
-public:
-
 	// ----------------------------------------------------------------------------
-	// Public constructors.
+	// Constructors.
 	// ----------------------------------------------------------------------------
 	constexpr BigInt() : _number{0} {}
 
@@ -82,14 +84,14 @@ public:
 	}
 
 	// From not wider BigInt. Implicit conversion.
-	template <typename C, size_t W, typename std::enable_if<((sizeof(C) * W) <= NUMBER_WIDTH_BYTES), int>::type = 0>
-	constexpr BigInt(const BigInt<C, W>& rv) : _number{0}{
+	template <size_t W, typename std::enable_if<(W <= WIDTH_BITS), int>::type = 0>
+	constexpr BigInt(const BigInt<W>& rv) : _number{0}{
 		load_big_int(rv);
 	}
 
 	// From wider BigInt. Explicit conversion is needed.
-	template <typename C, size_t W, typename std::enable_if<((sizeof(C) * W) > NUMBER_WIDTH_BYTES), int>::type = 0>
-	constexpr explicit BigInt(const BigInt<C, W>& rv) : _number{0}{
+	template <size_t W, typename std::enable_if<(W > WIDTH_BITS), int>::type = 0>
+	constexpr explicit BigInt(const BigInt<W>& rv) : _number{0}{
 		load_big_int(rv);
 	}
 
@@ -100,7 +102,7 @@ public:
 	template <typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= NUMBER_WIDTH_BYTES), int>::type = 0>
 	constexpr BigInt& operator=(const T& init) {
 		size_t idx = 0;
-		while(idx < WIDTH_CHUNKS) {
+		while(idx < NUMBER_WIDTH_CHUNKS) {
 			_number[idx++] = 0;
 		}
 		load_integer(init);
@@ -108,8 +110,8 @@ public:
 	}
 
 	// From not wider BigInt.
-	template <typename C, size_t W, typename std::enable_if<((sizeof(C) * W) <= NUMBER_WIDTH_BYTES), int>::type = 0>
-	constexpr BigInt& operator=(const BigInt<C, W>& rv) {
+	template <size_t W, typename std::enable_if<(W <= NUMBER_WIDTH_BYTES), int>::type = 0>
+	constexpr BigInt& operator=(const BigInt<W>& rv) {
 		load_big_int(rv);
 		return *this;
 	}
@@ -122,14 +124,14 @@ public:
 	static constexpr BigInt max() {
 		BigInt result;
 		result.bitwise_not();
-		result._number[WIDTH_CHUNKS - 1u] = UChunk(~MSBIT_MASK);
+		result._number[NUMBER_WIDTH_CHUNKS - 1u] = UChunk(~MSBIT_MASK);
 		return result;
 	}
 
 	// The minimum value the FixPoint can store.
 	static constexpr BigInt min() {
 		BigInt result;
-		result._number[WIDTH_CHUNKS - 1u] = MSBIT_MASK;
+		result._number[NUMBER_WIDTH_CHUNKS - 1u] = MSBIT_MASK;
 		return result;
 	}
 
@@ -335,10 +337,10 @@ public:
 	}
 
 	constexpr bool msbit() const {
-		return _number[WIDTH_CHUNKS - 1] & MSBIT_MASK;
+		return _number[NUMBER_WIDTH_CHUNKS - 1] & MSBIT_MASK;
 	}
 
-private:
+protected:
 
 	// Load integers.
 	template <typename T>
@@ -355,7 +357,7 @@ private:
 	template <typename T, typename std::enable_if<(sizeof(T) > sizeof(UChunk)), int>::type = 0>
 	constexpr void load_integer_unsigned(T val) {
 		size_t idx = 0;
-		while((idx < WIDTH_CHUNKS) && (val != 0)) {
+		while((idx < NUMBER_WIDTH_CHUNKS) && (val != 0)) {
 			_number[idx++] = val & CHUNK_MASK;
 			val >>= CHUNK_WIDTH_BITS;
 		}
@@ -383,9 +385,9 @@ private:
 	template <typename T, typename std::enable_if<(sizeof(T) > sizeof(UChunk)), int>::type = 0>
 	constexpr void store_integer_unsigned(T& val) const {
 		constexpr size_t CHUNKS_RATIO = sizeof(T) / sizeof(UChunk);
-		size_t idx = ((WIDTH_CHUNKS < CHUNKS_RATIO) ? WIDTH_CHUNKS : CHUNKS_RATIO) - 1u;
+		size_t idx = ((NUMBER_WIDTH_CHUNKS < CHUNKS_RATIO) ? NUMBER_WIDTH_CHUNKS : CHUNKS_RATIO) - 1u;
 		val = 0;
-		while(idx < WIDTH_CHUNKS) {
+		while(idx < NUMBER_WIDTH_CHUNKS) {
 			val <<= CHUNK_WIDTH_BITS;
 			val |= _number[idx--] & CHUNK_MASK;
 		}
@@ -397,8 +399,8 @@ private:
 	}
 
 	// Load BigInt.
-	template <typename C, size_t W>
-	constexpr void load_big_int(BigInt<C, W> bi) {
+	template <size_t W>
+	constexpr void load_big_int(BigInt<W> bi) {
 		const bool msb = bi.msbit();
 		if(msb) {
 			bi.bitwise_not();
@@ -409,13 +411,12 @@ private:
 		}
 	}
 
-	template <typename C, size_t W, typename std::enable_if<(sizeof(C) < sizeof(UChunk)), int>::type = 0>
-	constexpr void load_big_int_unsigned(BigInt<C, W> rv) {
-		static_assert((sizeof(UChunk) % (sizeof(C))) == 0);
-		constexpr size_t CHUNKS_RATIO = sizeof(UChunk) / sizeof(C);
+	template <size_t W, typename std::enable_if<(BigInt<W>::CHUNK_WIDTH_BYTES < CHUNK_WIDTH_BYTES), int>::type = 0>
+	constexpr void load_big_int_unsigned(BigInt<W> rv) {
+		constexpr size_t CHUNKS_RATIO = CHUNK_WIDTH_BYTES / BigInt<W>::CHUNK_WIDTH_BYTES;
 
 		size_t idx = 0;
-		while(idx < WIDTH_CHUNKS) {
+		while(idx < NUMBER_WIDTH_CHUNKS) {
 			_number[idx++] = 0;
 		}
 
@@ -423,8 +424,8 @@ private:
 
 		size_t src_idx = 0;
 		size_t dst_idx = 0;
-		while((dst_idx < WIDTH_CHUNKS) && (src_idx < src_width_chunks)) {
-			const size_t src_shift = (src_idx % CHUNKS_RATIO) * BigInt<C, W>::CHUNK_WIDTH_BITS;
+		while((dst_idx < NUMBER_WIDTH_CHUNKS) && (src_idx < src_width_chunks)) {
+			const size_t src_shift = (src_idx % CHUNKS_RATIO) * BigInt<W>::CHUNK_WIDTH_BITS;
 			UChunk chunk_part = rv._number[src_idx];
 			chunk_part = (chunk_part << src_shift) & CHUNK_MASK;
 			_number[dst_idx] |= chunk_part;
@@ -434,37 +435,35 @@ private:
 
 	}
 
-	template <typename C, size_t W, typename std::enable_if<(sizeof(C) > sizeof(UChunk)), int>::type = 0>
-	constexpr void load_big_int_unsigned(BigInt<C, W> rv) {
-		static_assert((sizeof(C) % sizeof(UChunk)) == 0);
-
-		constexpr size_t CHUNKS_RATIO = sizeof(C) / sizeof(UChunk);
+	template <size_t W, typename std::enable_if<(BigInt<W>::CHUNK_WIDTH_BYTES > CHUNK_WIDTH_BYTES), int>::type = 0>
+	constexpr void load_big_int_unsigned(BigInt<W> rv) {
+		constexpr size_t CHUNKS_RATIO = BigInt<W>::CHUNK_WIDTH_BYTES / CHUNK_WIDTH_BYTES;
 		const size_t src_width_chunks = rv.valuable_chunks();
 
 		size_t src_idx = 0;
 		size_t dst_idx = 0;
-		while((dst_idx < WIDTH_CHUNKS) && (src_idx < src_width_chunks)) {
+		while((dst_idx < NUMBER_WIDTH_CHUNKS) && (src_idx < src_width_chunks)) {
 			const size_t src_shift = (dst_idx % CHUNKS_RATIO) * CHUNK_WIDTH_BITS;
 			_number[dst_idx] = (rv._number[src_idx] >> src_shift);
 			++dst_idx;
 			src_idx = dst_idx / CHUNKS_RATIO;
 		}
 
-		while(dst_idx < WIDTH_CHUNKS) {
+		while(dst_idx < NUMBER_WIDTH_CHUNKS) {
 			_number[dst_idx++] = 0;
 		}
 	}
 
-	template <typename C, size_t W, typename std::enable_if<(sizeof(C) == sizeof(UChunk)), int>::type = 0>
-	constexpr void load_big_int_unsigned(BigInt<C, W> bi) {
-		const size_t width = ((W < WIDTH_CHUNKS) ? W : WIDTH_CHUNKS);
+	template <size_t W, typename std::enable_if<(BigInt<W>::CHUNK_WIDTH_BYTES == CHUNK_WIDTH_BYTES), int>::type = 0>
+	constexpr void load_big_int_unsigned(BigInt<W> bi) {
+		const size_t width = ((BigInt<W>::NUMBER_WIDTH_CHUNKS < NUMBER_WIDTH_CHUNKS) ? BigInt<W>::NUMBER_WIDTH_CHUNKS : NUMBER_WIDTH_CHUNKS);
 
 		size_t idx = 0;
 		while(idx < width) {
 			_number[idx] = bi._number[idx];
 			++idx;
 		}
-		while(idx < WIDTH_CHUNKS) {
+		while(idx < NUMBER_WIDTH_CHUNKS) {
 			_number[idx++] = 0;
 		}
 	}
@@ -477,36 +476,36 @@ private:
 	}
 
 	constexpr void bitwise_and(const BigInt& rv) {
-		for(size_t idx = 0; idx < WIDTH_CHUNKS; ++idx) {
+		for(size_t idx = 0; idx < NUMBER_WIDTH_CHUNKS; ++idx) {
 			_number[idx] &= rv._number[idx];
 		}
 	}
 
 	constexpr void bitwise_or(const BigInt& rv) {
-		for(size_t idx = 0; idx < WIDTH_CHUNKS; ++idx) {
+		for(size_t idx = 0; idx < NUMBER_WIDTH_CHUNKS; ++idx) {
 			_number[idx] |= rv._number[idx];
 		}
 	}
 
 	constexpr void bitwise_xor(const BigInt& rv) {
-		for(size_t idx = 0; idx < WIDTH_CHUNKS; ++idx) {
+		for(size_t idx = 0; idx < NUMBER_WIDTH_CHUNKS; ++idx) {
 			_number[idx] ^= rv._number[idx];
 		}
 	}
 
 	constexpr void shift_left(size_t shift_bits) {
-		shift_bits = (shift_bits < NUMBER_WIDTH_BITS) ? shift_bits : NUMBER_WIDTH_BITS;
+		shift_bits = (shift_bits < WIDTH_BITS) ? shift_bits : WIDTH_BITS;
 		const size_t shift_chunks = shift_bits / CHUNK_WIDTH_BITS;
 		
 		// Shifting chunks.
-		size_t dst = WIDTH_CHUNKS - 1u;
+		size_t dst = NUMBER_WIDTH_CHUNKS - 1u;
 		size_t src = dst - shift_chunks;
-		while(src < WIDTH_CHUNKS) {
+		while(src < NUMBER_WIDTH_CHUNKS) {
 			_number[dst] = _number[src];
 			--dst;
 			--src;
 		}
-		while(dst < WIDTH_CHUNKS) {
+		while(dst < NUMBER_WIDTH_CHUNKS) {
 			_number[dst] = 0;
 			--dst;
 		}
@@ -516,7 +515,7 @@ private:
 		const size_t shift_bits_compl = CHUNK_WIDTH_BITS - shift_bits;
 
 		if(shift_bits) {
-			size_t idx = WIDTH_CHUNKS - 1u;
+			size_t idx = NUMBER_WIDTH_CHUNKS - 1u;
 			while(idx) {
 				_number[idx] = (_number[idx] << shift_bits) | (_number[idx - 1] >> shift_bits_compl);
 				--idx;
@@ -537,18 +536,18 @@ private:
 	}
 
 	constexpr void shift_right_unsigned(size_t shift_bits) {
-		shift_bits = (shift_bits < NUMBER_WIDTH_BITS) ? shift_bits : NUMBER_WIDTH_BITS;
+		shift_bits = (shift_bits < WIDTH_BITS) ? shift_bits : WIDTH_BITS;
 		const size_t shift_chunks = shift_bits / CHUNK_WIDTH_BITS;
 
 		// Shifting chunks.
 		size_t dst = 0;
 		size_t src = shift_chunks;
-		while(src < WIDTH_CHUNKS) {
+		while(src < NUMBER_WIDTH_CHUNKS) {
 			_number[dst] = _number[src];
 			++dst;
 			++src;
 		}
-		while(dst < WIDTH_CHUNKS) {
+		while(dst < NUMBER_WIDTH_CHUNKS) {
 			_number[dst] = 0;
 			++dst;
 		}
@@ -559,7 +558,7 @@ private:
 
 		if(shift_bits) {
 			size_t idx = 0;
-			while(idx < (WIDTH_CHUNKS - 1u)) {
+			while(idx < (NUMBER_WIDTH_CHUNKS - 1u)) {
 				_number[idx] = (_number[idx] >> shift_bits) | (_number[idx + 1] << shift_bits_compl);
 				++idx;
 			}
@@ -571,7 +570,7 @@ private:
 	// Arithmetic operators.
 	constexpr UChunk add(const BigInt& rv) {
 		bool carry = false;
-		for(size_t idx = 0; idx < WIDTH_CHUNKS; ++idx) {
+		for(size_t idx = 0; idx < NUMBER_WIDTH_CHUNKS; ++idx) {
 			_number[idx] += rv._number[idx];
 			const bool hcarry = _number[idx] < rv._number[idx];
 			_number[idx] += carry;
@@ -582,10 +581,10 @@ private:
 
 	constexpr void mult(const BigInt& rv) {
 		BigInt acc;
-		for(size_t i = 0; i < WIDTH_CHUNKS; ++i) {
-			for(size_t j = 0; j < WIDTH_CHUNKS; ++j) {
+		for(size_t i = 0; i < NUMBER_WIDTH_CHUNKS; ++i) {
+			for(size_t j = 0; j < NUMBER_WIDTH_CHUNKS; ++j) {
 				const size_t offset = i + j;
-				if(offset < WIDTH_CHUNKS) {
+				if(offset < NUMBER_WIDTH_CHUNKS) {
 					const UChunk chunk_xl = (_number[i] & HALF_CHUNK_LOW_MASK);
 					const UChunk chunk_xh = (_number[i] >> HALF_CHUNK_WIDTH_BITS);
 					const UChunk chunk_yl = (rv._number[j] & HALF_CHUNK_LOW_MASK);
@@ -599,7 +598,7 @@ private:
 					acc.chunk_add_offset(chunk_xl_yh << HALF_CHUNK_WIDTH_BITS, offset);
 					acc.chunk_add_offset(chunk_xh_yl << HALF_CHUNK_WIDTH_BITS, offset);
 
-					if(offset < (WIDTH_CHUNKS - 1u)) {
+					if(offset < (NUMBER_WIDTH_CHUNKS - 1u)) {
 						const UChunk chunk_xh_yh = chunk_xh * chunk_yh;
 						acc.chunk_add_offset(chunk_xl_yh >> HALF_CHUNK_WIDTH_BITS, offset + 1u);
 						acc.chunk_add_offset(chunk_xh_yl >> HALF_CHUNK_WIDTH_BITS, offset + 1u);
@@ -613,7 +612,7 @@ private:
 
 	constexpr void mult_chunk(const UChunk& chunk) {
 		BigInt acc;
-		for(size_t idx = 0; idx < WIDTH_CHUNKS; ++idx) {
+		for(size_t idx = 0; idx < NUMBER_WIDTH_CHUNKS; ++idx) {
 			const UChunk chunk_xl = (_number[idx] & HALF_CHUNK_LOW_MASK);
 			const UChunk chunk_xh = (_number[idx] >> HALF_CHUNK_WIDTH_BITS);
 			const UChunk chunk_yl = (chunk & HALF_CHUNK_LOW_MASK);
@@ -627,7 +626,7 @@ private:
 			acc.chunk_add_offset(chunk_xl_yh << HALF_CHUNK_WIDTH_BITS, idx);
 			acc.chunk_add_offset(chunk_xh_yl << HALF_CHUNK_WIDTH_BITS, idx);
 
-			if(idx < (WIDTH_CHUNKS - 1u)) {
+			if(idx < (NUMBER_WIDTH_CHUNKS - 1u)) {
 				const UChunk chunk_xh_yh = chunk_xh * chunk_yh;
 				acc.chunk_add_offset(chunk_xl_yh >> HALF_CHUNK_WIDTH_BITS, idx + 1u);
 				acc.chunk_add_offset(chunk_xh_yl >> HALF_CHUNK_WIDTH_BITS, idx + 1u);
@@ -745,7 +744,7 @@ private:
 		UChunk carry = (_number[idx] < ch);
 		++idx;
 
-		while(carry && (idx < WIDTH_CHUNKS)) {
+		while(carry && (idx < NUMBER_WIDTH_CHUNKS)) {
 			_number[idx] += carry;
 			carry = (_number[idx] < carry);
 			++idx;
@@ -755,8 +754,8 @@ private:
 
 	constexpr size_t valuable_chunks() const {
 		size_t result = 0;
-		size_t idx = WIDTH_CHUNKS - 1u;
-		while(idx < WIDTH_CHUNKS) {
+		size_t idx = NUMBER_WIDTH_CHUNKS - 1u;
+		while(idx < NUMBER_WIDTH_CHUNKS) {
 			if(_number[idx]) {
 				result = idx + 1u;
 				break;
@@ -768,8 +767,8 @@ private:
 
 	constexpr size_t most_valuable_half_chunks_idx() const {
 		size_t result = 0;
-		size_t idx = WIDTH_CHUNKS - 1;
-		while(idx < WIDTH_CHUNKS) {
+		size_t idx = NUMBER_WIDTH_CHUNKS - 1;
+		while(idx < NUMBER_WIDTH_CHUNKS) {
 			if(_number[idx] & HALF_CHUNK_HIGH_MASK) {
 				result = idx * 2u + 1u;
 				break;
@@ -786,7 +785,7 @@ private:
 	}
 
 	constexpr size_t last_diff_chunk(const BigInt& rv) const {
-		size_t idx = WIDTH_CHUNKS - 1;
+		size_t idx = NUMBER_WIDTH_CHUNKS - 1;
 		while(idx && (_number[idx] == rv._number[idx])) {
 			--idx;
 		}

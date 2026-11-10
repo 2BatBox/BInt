@@ -43,84 +43,35 @@ class TestBigInt {
 		}
 	};
 
-	static constexpr size_t CHARS_PER_SHORT = sizeof(signed short);
-	static constexpr size_t CHARS_PER_INT = sizeof(signed int);
-	static constexpr size_t CHARS_PER_LONG = sizeof(signed long);
-	static constexpr size_t SHORTS_PER_INT = sizeof(signed int) / sizeof(signed short);
-	static constexpr size_t SHORTS_PER_LONG = sizeof(signed long) / sizeof(signed short);
-	static constexpr size_t INT_PER_LONG = sizeof(signed long) / sizeof(signed int);
-
-	using BiChar_t = BigInt<signed char, 1u>;
-	using BiShort_t = BigInt<signed char, CHARS_PER_SHORT>;
-	using BiInt_t = BigInt<signed char, CHARS_PER_INT>;
-	using BiLong_t = BigInt<signed char, CHARS_PER_LONG>;
+	using BiChar_t = BigInt<CHAR_BIT>;
+	using BiShort_t = BigInt<sizeof(signed short) * CHAR_BIT>;
+	using BiInt_t = BigInt<sizeof(signed int) * CHAR_BIT>;
+	using BiLong_t = BigInt<sizeof(signed long) * CHAR_BIT>;
+	using BiLongLong_t = BigInt<sizeof(signed long long) * CHAR_BIT>;
 
 #define ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGERS(func, rounds) { \
 	printf("->TestBigInt::"#func"()\n"); \
-	func<BigInt<signed char, 1u>, signed char>(rounds); \
-	func<BigInt<signed char, CHARS_PER_SHORT>, signed short>(rounds); \
-	func<BigInt<signed char, CHARS_PER_INT>, signed int>(rounds); \
-	func<BigInt<signed char, CHARS_PER_LONG>, signed long>(rounds); \
-	func<BigInt<signed short, 1u>, signed short>(rounds); \
-	func<BigInt<signed short, SHORTS_PER_INT>, signed int>(rounds); \
-	func<BigInt<signed short, SHORTS_PER_LONG>, signed long>(rounds); \
-	func<BigInt<signed int, 1u>, signed int>(rounds); \
-	func<BigInt<signed int, INT_PER_LONG>, signed long>(rounds); \
-	func<BigInt<signed long, 1u>, signed long>(rounds); \
-}
-
-#define ITERATE_BIGINT_AND_EQUAL_WIDTH_BIGINT(func, rounds) { \
-	printf("->TestBigInt::"#func"()\n"); \
-	func<BigInt<signed char,  1u>, BigInt<signed char,  1u>>(rounds); \
-	func<BigInt<signed char,  CHARS_PER_SHORT>, BigInt<signed short, 1u>>(rounds); \
-	func<BigInt<signed char,  CHARS_PER_SHORT * 2u>, BigInt<signed short, 2u>>(rounds); \
-	func<BigInt<signed char,  CHARS_PER_SHORT * 3u>, BigInt<signed short, 3u>>(rounds); \
-	func<BigInt<signed char,  CHARS_PER_INT>, BigInt<signed int, 1u>>(rounds); \
-	func<BigInt<signed char,  CHARS_PER_INT * 2u>, BigInt<signed int, 2u>>(rounds); \
-	func<BigInt<signed char,  CHARS_PER_INT * 3u>, BigInt<signed int, 3u>>(rounds); \
-	func<BigInt<signed char,  CHARS_PER_LONG>, BigInt<signed long, 1u>>(rounds); \
-	func<BigInt<signed char,  CHARS_PER_LONG * 2u>, BigInt<signed long, 2u>>(rounds); \
-	func<BigInt<signed char,  CHARS_PER_LONG * 3u>, BigInt<signed long, 3u>>(rounds); \
-	func<BigInt<signed short,  1u>, BigInt<signed short, 1u>>(rounds); \
-	func<BigInt<signed short,  SHORTS_PER_INT>, BigInt<signed int, 1u>>(rounds); \
-	func<BigInt<signed short,  SHORTS_PER_INT * 2u>, BigInt<signed int, 2u>>(rounds); \
-	func<BigInt<signed short,  SHORTS_PER_INT * 3u>, BigInt<signed int, 3u>>(rounds); \
-	func<BigInt<signed short,  SHORTS_PER_LONG>, BigInt<signed long, 1u>>(rounds); \
-	func<BigInt<signed short,  SHORTS_PER_LONG * 2u>, BigInt<signed long, 2u>>(rounds); \
-	func<BigInt<signed short,  SHORTS_PER_LONG * 3u>, BigInt<signed long, 3u>>(rounds); \
-	func<BigInt<signed int,  1u>, BigInt<signed int, 1u>>(rounds); \
-	func<BigInt<signed int,  INT_PER_LONG>, BigInt<signed long, 1u>>(rounds); \
-	func<BigInt<signed int,  INT_PER_LONG * 2u>, BigInt<signed long, 2u>>(rounds); \
-	func<BigInt<signed int,  INT_PER_LONG * 3u>, BigInt<signed long, 3u>>(rounds); \
-	func<BigInt<signed long, 1u>, BigInt<signed long, 1u>>(rounds); \
+	func<BiChar_t, signed char>(rounds); \
+	func<BiShort_t, signed short>(rounds); \
+	func<BiInt_t, signed int>(rounds); \
+	func<BiLong_t, signed long>(rounds);\
+	func<BiLongLong_t, signed long long>(rounds); \
 }
 
 #define ITERATE_BIGINT_AND_WIDER_BIGINT(func, rounds) { \
-	printf("->TestBigInt::"#func"()\n"); \
-	func<BigInt<signed char,  1u>, BigInt<signed char,  2u>>(rounds); \
-	func<BigInt<signed char,  CHARS_PER_SHORT>, BigInt<signed short, 2u>>(rounds); \
-	func<BigInt<signed char,  CHARS_PER_SHORT * 2u>, BigInt<signed short, 3u>>(rounds); \
-	func<BigInt<signed char,  CHARS_PER_SHORT * 3u>, BigInt<signed short, 4u>>(rounds); \
-	func<BigInt<signed char,  CHARS_PER_INT>, BigInt<signed int, 2u>>(rounds); \
-	func<BigInt<signed char,  CHARS_PER_INT * 2u>, BigInt<signed int, 3u>>(rounds); \
-	func<BigInt<signed char,  CHARS_PER_INT * 3u>, BigInt<signed int, 4u>>(rounds); \
-	func<BigInt<signed char,  CHARS_PER_LONG>, BigInt<signed long, 2u>>(rounds); \
-	func<BigInt<signed char,  CHARS_PER_LONG * 2u>, BigInt<signed long, 3u>>(rounds); \
-	func<BigInt<signed char,  CHARS_PER_LONG * 3u>, BigInt<signed long, 4u>>(rounds); \
-	func<BigInt<signed short,  1u>, BigInt<signed short, 2u>>(rounds); \
-	func<BigInt<signed short,  SHORTS_PER_INT>, BigInt<signed int, 2u>>(rounds); \
-	func<BigInt<signed short,  SHORTS_PER_INT * 2u>, BigInt<signed int, 3u>>(rounds); \
-	func<BigInt<signed short,  SHORTS_PER_INT * 3u>, BigInt<signed int, 4u>>(rounds); \
-	func<BigInt<signed short,  SHORTS_PER_LONG>, BigInt<signed long, 2u>>(rounds); \
-	func<BigInt<signed short,  SHORTS_PER_LONG * 2u>, BigInt<signed long, 3u>>(rounds); \
-	func<BigInt<signed short,  SHORTS_PER_LONG * 3u>, BigInt<signed long, 4u>>(rounds); \
-	func<BigInt<signed int,  1u>, BigInt<signed int, 2u>>(rounds); \
-	func<BigInt<signed int,  INT_PER_LONG>, BigInt<signed long, 2u>>(rounds); \
-	func<BigInt<signed int,  INT_PER_LONG * 2u>, BigInt<signed long, 3u>>(rounds); \
-	func<BigInt<signed int,  INT_PER_LONG * 3u>, BigInt<signed long, 4u>>(rounds); \
-	func<BigInt<signed long, 1u>, BigInt<signed long, 2u>>(rounds); \
+printf("->TestBigInt::"#func"()\n"); \
+	func<BigInt<CHAR_BIT>, BigInt<CHAR_BIT * 2u>>(rounds); \
+	func<BigInt<CHAR_BIT>, BigInt<CHAR_BIT * 3u>>(rounds); \
+	func<BigInt<CHAR_BIT>, BigInt<CHAR_BIT * 4u>>(rounds); \
+	func<BigInt<CHAR_BIT * 2u>, BigInt<CHAR_BIT * 3u>>(rounds); \
+	func<BigInt<CHAR_BIT * 2u>, BigInt<CHAR_BIT * 4u>>(rounds); \
+	func<BigInt<CHAR_BIT * 2u>, BigInt<CHAR_BIT * 5u>>(rounds); \
+	func<BigInt<CHAR_BIT * 2u>, BigInt<CHAR_BIT * 8u>>(rounds); \
+	func<BigInt<CHAR_BIT * 7u>, BigInt<CHAR_BIT * 8u>>(rounds); \
+	func<BigInt<CHAR_BIT * 7u>, BigInt<CHAR_BIT * 10u>>(rounds); \
+	func<BigInt<CHAR_BIT * 7u>, BigInt<CHAR_BIT * 13u>>(rounds); \
+	func<BigInt<CHAR_BIT * 7u>, BigInt<CHAR_BIT * 64u>>(rounds); \
 }
-
 public:
 
 	TestBigInt() {
@@ -128,7 +79,6 @@ public:
 
 		// Type conversion tests.
 		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGERS(test_load_store_int, AUTOTEST_ROUNDS);
-		ITERATE_BIGINT_AND_EQUAL_WIDTH_BIGINT(test_load_store_big_int, AUTOTEST_ROUNDS);
 		ITERATE_BIGINT_AND_WIDER_BIGINT(test_load_store_big_int, AUTOTEST_ROUNDS);
 		test_type_conversion_bigint_int();
 		test_type_conversion_bigint_bigint();
@@ -145,12 +95,21 @@ public:
 
 		test_constexpr_values();
 
-		test_performance_all<1u>(PERFORMANCE_TEST_ROUNDS);
-		test_performance_all<2u>(PERFORMANCE_TEST_ROUNDS);
-		test_performance_all<3u>(PERFORMANCE_TEST_ROUNDS);
-		test_performance_all<4u>(PERFORMANCE_TEST_ROUNDS);
-		test_performance_all<13u>(PERFORMANCE_TEST_ROUNDS);
-		test_performance_all<99u>(PERFORMANCE_TEST_ROUNDS);
+		test_performance_reference_all(PERFORMANCE_TEST_ROUNDS);
+
+		test_performance<BigInt<CHAR_BIT * 1u>>(PERFORMANCE_TEST_ROUNDS);
+		test_performance<BigInt<CHAR_BIT * 2u>>(PERFORMANCE_TEST_ROUNDS);
+		test_performance<BigInt<CHAR_BIT * 3u>>(PERFORMANCE_TEST_ROUNDS);
+		test_performance<BigInt<CHAR_BIT * 4u>>(PERFORMANCE_TEST_ROUNDS);
+		test_performance<BigInt<CHAR_BIT * 5u>>(PERFORMANCE_TEST_ROUNDS);
+		test_performance<BigInt<CHAR_BIT * 6u>>(PERFORMANCE_TEST_ROUNDS);
+		test_performance<BigInt<CHAR_BIT * 7u>>(PERFORMANCE_TEST_ROUNDS);
+		test_performance<BigInt<CHAR_BIT * 8u>>(PERFORMANCE_TEST_ROUNDS);
+		test_performance<BigInt<CHAR_BIT * 10u>>(PERFORMANCE_TEST_ROUNDS);
+		test_performance<BigInt<CHAR_BIT * 15u>>(PERFORMANCE_TEST_ROUNDS);
+		test_performance<BigInt<CHAR_BIT * 16u>>(PERFORMANCE_TEST_ROUNDS);
+		test_performance<BigInt<CHAR_BIT * 48u>>(PERFORMANCE_TEST_ROUNDS);
+		test_performance<BigInt<CHAR_BIT * 256u>>(PERFORMANCE_TEST_ROUNDS);
 	}
 
 	template <typename BigType_t, typename Integer>
@@ -594,28 +553,32 @@ public:
 	// -----------------------------------------------------------------------
 	// Performance test.
 	// -----------------------------------------------------------------------
-	template <size_t CHUNK_WIDTH>
-	void test_performance_all(size_t rounds) {
-		test_performance<BigInt<signed char, CHUNK_WIDTH>>(rounds);
-		test_performance<BigInt<signed short, CHUNK_WIDTH>>(rounds);
-		test_performance<BigInt<signed int, CHUNK_WIDTH>>(rounds);
-		test_performance<BigInt<signed long, CHUNK_WIDTH>>(rounds);
-		test_performance<BigInt<signed long long, CHUNK_WIDTH>>(rounds);
-	}
-
 	template <typename BigType_t>
 	void test_performance(size_t rounds) {
-		printf(
-			"Performance test BigInt<%zu, %zu>. %zu bit signed integer.\n",
-			BigType_t::CHUNK_WIDTH_BITS,
-			BigType_t::NUMBER_WIDTH_CHUNKS,
-			BigType_t::NUMBER_WIDTH_BITS
-		);
-
+		printf("Performance test BigInt<%zu>.\n", BigType_t::NUMBER_WIDTH_BITS );
 		size_t result = 0;
 		result += test_performance_add_sub<BigType_t>(rounds);
 		result += test_performance_mult<BigType_t>(rounds);
 		result += test_performance_div<BigType_t>(rounds);
+		printf("Performance test finishes with checksum %zu.\n\n", result);
+	}
+
+	void test_performance_reference_all(size_t rounds) {
+		test_performance_reference<signed char>(rounds);
+		test_performance_reference<signed short>(rounds);
+		test_performance_reference<signed int>(rounds);
+		test_performance_reference<signed long>(rounds);
+		test_performance_reference<signed long long>(rounds);
+	}
+
+	template <typename Integer_t>
+	void test_performance_reference(size_t rounds) {
+		printf("Performance test %zu bit signed integer.\n", sizeof(Integer_t) * CHAR_BIT);
+
+		size_t result = 0;
+		result += test_performance_add_sub<Integer_t>(rounds);
+		result += test_performance_mult<Integer_t>(rounds);
+		result += test_performance_div<Integer_t>(rounds);
 
 		printf("Performance test finishes with checksum %zu.\n\n", result);
 	}
@@ -655,7 +618,7 @@ public:
 		perf_sub.stop();
 
 		for(size_t idx = 0; idx < rounds; ++idx) {
-			result += x[idx].msbit();
+			result += (x[idx] < BigType_t(0));
 		}
 
 		perf_add.print(rounds);
@@ -682,7 +645,7 @@ public:
 		for(size_t idx = 0; idx < rounds; ++idx) {
 			x[idx] = gen.next();
 			do {
-				y[idx] = (gen.next() >> (BigType_t::NUMBER_WIDTH_BITS / 2u));
+				y[idx] = (gen.next() >> (sizeof(BigType_t) * CHAR_BIT / 2u));
 			} while(y[idx] == BigType_t(0));
 			x_ref[idx] = x[idx];
 		}
@@ -694,7 +657,7 @@ public:
 		perf_mult.stop();
 
 		for(size_t idx = 0; idx < rounds; ++idx) {
-			result += x[idx].msbit();
+			result += (x[idx] < BigType_t(0));
 		}
 
 		perf_mult.print(rounds);
@@ -720,7 +683,7 @@ public:
 		for(size_t idx = 0; idx < rounds; ++idx) {
 			x[idx] = gen.next();
 			do {
-				y[idx] = (gen.next() >> (BigType_t::NUMBER_WIDTH_BITS / 2u));
+				y[idx] = (gen.next() >> (sizeof(BigType_t) * CHAR_BIT / 2u));
 			} while(y[idx] == BigType_t(0));
 			x_ref[idx] = x[idx];
 		}
@@ -732,7 +695,7 @@ public:
 		perf_div.stop();
 
 		for(size_t idx = 0; idx < rounds; ++idx) {
-			result += x[idx].msbit();
+			result += (x[idx] < BigType_t(0));
 		}
 
 		perf_div.print(rounds);
