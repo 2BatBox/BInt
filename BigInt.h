@@ -71,26 +71,17 @@ struct BigInt {
 	BigInt(BigInt&& rv) = default;
 	BigInt& operator=(BigInt&& rv) = default;
 
-	// From not wider integer. Implicit conversion.
 	template <typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= NUMBER_WIDTH_BYTES), int>::type = 0>
 	constexpr BigInt(const T& init) : _number{0} {
 		load_integer(init);
 	}
 
-	// From wider integer. Explicit conversion is needed.
 	template <typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) > NUMBER_WIDTH_BYTES), int>::type = 0>
 	constexpr explicit BigInt(const T& init) : _number{0} {
 		load_integer(init);
 	}
 
-	// From not wider BigInt. Implicit conversion.
-	template <size_t W, typename std::enable_if<(W <= WIDTH_BITS), int>::type = 0>
-	constexpr BigInt(const BigInt<W>& rv) : _number{0}{
-		load_big_int(rv);
-	}
-
-	// From wider BigInt. Explicit conversion is needed.
-	template <size_t W, typename std::enable_if<(W > WIDTH_BITS), int>::type = 0>
+	template <size_t W>
 	constexpr explicit BigInt(const BigInt<W>& rv) : _number{0}{
 		load_big_int(rv);
 	}
@@ -138,14 +129,7 @@ struct BigInt {
 	// ----------------------------------------------------------------------------
 	// Type conversion.
 	// ----------------------------------------------------------------------------
-	template <typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) >= NUMBER_WIDTH_BYTES), int>::type = 0>
-	constexpr operator T() const {
-		T result;
-		store_integer(result);
-		return result;
-	}
-
-	template <typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) < NUMBER_WIDTH_BYTES), int>::type = 0>
+	template <typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value), int>::type = 0>
 	constexpr explicit operator T() const {
 		T result;
 		store_integer(result);
@@ -166,21 +150,9 @@ struct BigInt {
 		return *this;
 	}
 
-	constexpr BigInt operator&(const BigInt& rv) const {
-		BigInt result(*this);
-		result.bitwise_and(rv);
-		return result;
-	}
-
 	constexpr BigInt& operator|=(const BigInt& rv) {
 		bitwise_or(rv);
 		return *this;
-	}
-
-	constexpr BigInt operator|(const BigInt& rv) const {
-		BigInt result(*this);
-		result.bitwise_or(rv);
-		return result;
 	}
 
 	constexpr BigInt& operator^=(const BigInt& rv) {
@@ -188,10 +160,16 @@ struct BigInt {
 		return *this;
 	}
 
-	constexpr BigInt operator^(const BigInt& rv) const {
-		BigInt result(*this);
-		result.bitwise_xor(rv);
-		return result;
+	constexpr BigInt operator&(BigInt rv) const {
+		return rv.operator&=(*this);
+	}
+
+	constexpr BigInt operator|(BigInt rv) const {
+		return rv.operator|=(*this);
+	}
+
+	constexpr BigInt operator^(BigInt rv) const {
+		return rv.operator^=(*this);
 	}
 
 	// Shift left.
@@ -202,8 +180,7 @@ struct BigInt {
 
 	constexpr BigInt operator<<(const size_t shift) const {
 		BigInt result(*this);
-		result.shift_left(shift);
-		return result;
+		return result.operator<<=(shift);
 	}
 
 	// Arithmetic right shift.
@@ -214,8 +191,7 @@ struct BigInt {
 
 	constexpr BigInt operator>>(const size_t shift) const {
 		BigInt result(*this);
-		result.shift_right(shift);
-		return result;
+		return result.operator>>=(shift);
 	}
 
 	// Logical right shift.
@@ -225,7 +201,7 @@ struct BigInt {
 	}
 
 	// ----------------------------------------------------------------------------
-	// Relational operators.
+	// Relational functions.
 	// ----------------------------------------------------------------------------
 	constexpr bool operator==(const BigInt& rv) const {
 		const size_t idx = last_diff_chunk(rv);
@@ -233,25 +209,25 @@ struct BigInt {
 	}
 
 	constexpr bool operator!=(const BigInt& rv) const {
-		const size_t idx = last_diff_chunk(rv);
-		return _number[idx] != rv._number[idx];
-	}
-
-	constexpr bool operator>(const BigInt& rv) const {
-		return (msbit() == rv.msbit()) ? abs_val_greater(rv) : (not msbit());
+		return !operator==(rv);
 	}
 
 	constexpr bool operator<(const BigInt& rv) const {
 		return (msbit() == rv.msbit()) ? abs_val_less(rv) : msbit();
 	}
 
-	constexpr bool operator>=(const BigInt& rv) const {
-		return not operator<(rv);
+	constexpr bool operator>(const BigInt& rv) const {
+		return (msbit() == rv.msbit()) ? abs_val_greater(rv) : (not msbit());
 	}
 
 	constexpr bool operator<=(const BigInt& rv) const {
-		return not operator>(rv);
+		return !operator>(rv);
 	}
+
+	constexpr bool operator>=(const BigInt& rv) const {
+		return !operator<(rv);
+	}
+
 
 	// ----------------------------------------------------------------------------
 	// Arithmetic operators.
@@ -272,72 +248,89 @@ struct BigInt {
 		return result;
 	}
 
-	// Addition.
-	constexpr BigInt operator+(const BigInt& rv) const {
+	// Increment.
+	constexpr BigInt& operator++() {
+		chunk_add_offset(1u, 0);
+		return *this;
+	}
+
+	constexpr BigInt operator++(int) {
 		BigInt result(*this);
-		result.add(rv);
+		operator++();
 		return result;
 	}
 
+	// Decrement.
+	constexpr BigInt& operator--() {
+		bitwise_not();
+		chunk_add_offset(1u, 0);
+		bitwise_not();
+		return *this;
+	}
+
+	constexpr BigInt operator--(int) {
+		BigInt result(*this);
+		operator--();
+		return result;
+	}
+
+	// Addition.
 	constexpr BigInt& operator+=(const BigInt& rv) {
 		add(rv);
 		return *this;
 	}
 
-	// Subtraction.
-	constexpr BigInt operator-(const BigInt& rv) const {
-		BigInt result(*this);
-		result.add(-rv);
-		return result;
+	constexpr BigInt operator+(BigInt rv) const {
+		return rv.operator+=(*this);
 	}
 
+	// Subtraction.
 	constexpr BigInt& operator-=(const BigInt& rv) {
 		add(-rv);
 		return *this;
 	}
 
-	// Multiplication.
-	constexpr BigInt operator*(const BigInt& rv) const {
+	constexpr BigInt operator-(const BigInt& rv) const {
 		BigInt result(*this);
-		result.mult(rv);
-		return result;
+		return result.operator-=(rv);
 	}
 
+	// Multiplication.
 	constexpr BigInt& operator*=(const BigInt& rv) {
 		mult(rv);
 		return *this;
 	}
 
-	// Division.
-	constexpr BigInt operator/(const BigInt& rv) const {
-		BigInt result(*this);
-		BigInt result_div;
-		result.div(rv, result_div);
-		return result_div;
+	constexpr BigInt operator*(BigInt rv) const {
+		return rv.operator*=(*this);
 	}
 
+	// Division.
 	constexpr BigInt& operator/=(const BigInt& rv) {
-		BigInt result_div;
-		div(rv, result_div);
-		*this = result_div;
+		BigInt div_result;
+		div(rv, div_result);
+		*this = div_result;
+		return *this;
+	}
+
+	constexpr BigInt operator/(const BigInt& rv) const {
+		BigInt result(*this);
+		return result.operator/=(rv);
+	}
+
+	constexpr BigInt& operator%=(const BigInt& rv) {
+		BigInt div_result;
+		div(rv, div_result);
 		return *this;
 	}
 
 	constexpr BigInt operator%(const BigInt& rv) const {
 		BigInt result(*this);
-		BigInt result_div;
-		result.div(rv, result_div);
-		return result;
-	}
-
-	constexpr BigInt& operator%=(const BigInt& rv) {
-		BigInt result_div;
-		div(rv, result_div);
-		return *this;
+		return result.operator%=(rv);
 	}
 
 	constexpr bool msbit() const {
-		return _number[NUMBER_WIDTH_CHUNKS - 1] & MSBIT_MASK;
+		return _number[NUMBER_WIDTH_CHUNKS - 1u] & MSBIT_MASK;
 	}
 
 protected:
@@ -470,8 +463,8 @@ protected:
 	
 	// Bitwise operators.
 	constexpr void bitwise_not() {
-		for(auto& chunk : _number) {
-			chunk = ~chunk;
+		for(size_t idx = 0; idx < NUMBER_WIDTH_CHUNKS; ++idx) {
+			_number[idx] = ~_number[idx];
 		}
 	}
 
@@ -517,7 +510,7 @@ protected:
 		if(shift_bits) {
 			size_t idx = NUMBER_WIDTH_CHUNKS - 1u;
 			while(idx) {
-				_number[idx] = (_number[idx] << shift_bits) | (_number[idx - 1] >> shift_bits_compl);
+				_number[idx] = (_number[idx] << shift_bits) | (_number[idx - 1u] >> shift_bits_compl);
 				--idx;
 			}
 			_number[0] = (_number[0] << shift_bits);
@@ -559,7 +552,7 @@ protected:
 		if(shift_bits) {
 			size_t idx = 0;
 			while(idx < (NUMBER_WIDTH_CHUNKS - 1u)) {
-				_number[idx] = (_number[idx] >> shift_bits) | (_number[idx + 1] << shift_bits_compl);
+				_number[idx] = (_number[idx] >> shift_bits) | (_number[idx + 1u] << shift_bits_compl);
 				++idx;
 			}
 			_number[idx] = (_number[idx] >> shift_bits);
@@ -581,8 +574,10 @@ protected:
 
 	constexpr void mult(const BigInt& rv) {
 		BigInt acc;
-		for(size_t i = 0; i < NUMBER_WIDTH_CHUNKS; ++i) {
-			for(size_t j = 0; j < NUMBER_WIDTH_CHUNKS; ++j) {
+		const size_t val_ch = valuable_chunks();
+		const size_t rv_val_ch = rv.valuable_chunks();
+		for(size_t i = 0; i < val_ch; ++i) {
+			for(size_t j = 0; j < rv_val_ch; ++j) {
 				const size_t offset = i + j;
 				if(offset < NUMBER_WIDTH_CHUNKS) {
 					const UChunk chunk_xl = (_number[i] & HALF_CHUNK_LOW_MASK);
@@ -612,7 +607,8 @@ protected:
 
 	constexpr void mult_chunk(const UChunk& chunk) {
 		BigInt acc;
-		for(size_t idx = 0; idx < NUMBER_WIDTH_CHUNKS; ++idx) {
+		const size_t val_ch = valuable_chunks();
+		for(size_t idx = 0; idx < val_ch; ++idx) {
 			const UChunk chunk_xl = (_number[idx] & HALF_CHUNK_LOW_MASK);
 			const UChunk chunk_xh = (_number[idx] >> HALF_CHUNK_WIDTH_BITS);
 			const UChunk chunk_yl = (chunk & HALF_CHUNK_LOW_MASK);
@@ -655,12 +651,9 @@ protected:
 		}
 	}
 
-	constexpr void div_unsigned(BigInt denom, BigInt& result_div) {
-		BigInt num(*this);
-		BigInt result;
-
-		const size_t num_idx_hlf_start = num.most_valuable_half_chunks_idx();
-		const size_t denom_idx_hlf_start = denom.most_valuable_half_chunks_idx();
+	constexpr void div_unsigned(BigInt denom, BigInt& result) {
+		const size_t num_idx_hlf_start = most_valuable_half_chunk_idx();
+		const size_t denom_idx_hlf_start = denom.most_valuable_half_chunk_idx();
 		bool carry = false;
 
 		if(num_idx_hlf_start >= denom_idx_hlf_start) {
@@ -672,18 +665,18 @@ protected:
 				if(carry) {
 					const size_t idx_hlf_prev = idx_hlf + 1u;
 
-					while(num.half_chunk(idx_hlf_prev)) {
-						const UChunk div_floor = num.full_chunk(idx_hlf_prev) / (denom.half_chunk(idx_hlf) + 1u);
+					while(half_chunk(idx_hlf_prev)) {
+						const UChunk div_floor = full_chunk(idx_hlf_prev) / (denom.half_chunk(idx_hlf) + 1u);
 						BigInt mult_result = denom;
 						mult_result.mult_chunk(div_floor);
 						result.chunk_add_offset(div_floor, 0);
-						num -= mult_result;
+						operator-=(mult_result);
 					}
 					carry = false;
 				}
 
-				if(num.half_chunk(idx_hlf)){
-					const UChunk num_full_chunk = num.full_chunk(idx_hlf);
+				if(half_chunk(idx_hlf)){
+					const UChunk num_full_chunk = full_chunk(idx_hlf);
 					const UChunk denom_full_chunk = denom.full_chunk(idx_hlf);
 
 					if(num_full_chunk > denom_full_chunk) {
@@ -691,15 +684,15 @@ protected:
 						BigInt mult_result = denom;
 						mult_result.mult_chunk(div_floor);
 						result.chunk_add_offset(div_floor, 0);
-						num -= mult_result;
+						operator-=(mult_result);
 					}
 
-					while(not num.abs_val_less(denom)) {
-						num -= denom;
+					while(not abs_val_less(denom)) {
+						operator-=(denom);
 						result.chunk_add_offset(1u, 0);
 					}
 
-					carry = num.half_chunk(idx_hlf);
+					carry = half_chunk(idx_hlf);
 				}
 
 				if(shift_hd) {
@@ -711,8 +704,6 @@ protected:
 			}
 
 		}
-		result_div = result;
-		*this = num;
 	}
 
 
@@ -732,7 +723,7 @@ protected:
 		if((idx_hlf % 2u) == 0) {
 			result <<= HALF_CHUNK_WIDTH_BITS;
 			if(idx) {
-				result |= (_number[idx-1] >> HALF_CHUNK_WIDTH_BITS);
+				result |= (_number[idx-1u] >> HALF_CHUNK_WIDTH_BITS);
 			}
 		}
 		return result;
@@ -754,38 +745,35 @@ protected:
 
 	constexpr size_t valuable_chunks() const {
 		size_t result = 0;
-		size_t idx = NUMBER_WIDTH_CHUNKS - 1u;
-		while(idx < NUMBER_WIDTH_CHUNKS) {
+		for(size_t idx = 0; idx < NUMBER_WIDTH_CHUNKS; ++idx) {
 			if(_number[idx]) {
 				result = idx + 1u;
-				break;
 			}
-			--idx;
 		}
 		return result;
 	}
 
-	constexpr size_t most_valuable_half_chunks_idx() const {
+	constexpr size_t most_valuable_half_chunk_idx() const {
 		size_t result = 0;
-		size_t idx = NUMBER_WIDTH_CHUNKS - 1;
+		size_t idx = NUMBER_WIDTH_CHUNKS - 1u;
 		while(idx < NUMBER_WIDTH_CHUNKS) {
 			if(_number[idx] & HALF_CHUNK_HIGH_MASK) {
 				result = idx * 2u + 1u;
 				break;
 			}
-			
+
 			if(_number[idx] & HALF_CHUNK_LOW_MASK) {
 				result = idx * 2u;
 				break;
 			}
-			
+
 			--idx;
 		}
 		return result;
 	}
 
 	constexpr size_t last_diff_chunk(const BigInt& rv) const {
-		size_t idx = NUMBER_WIDTH_CHUNKS - 1;
+		size_t idx = NUMBER_WIDTH_CHUNKS - 1u;
 		while(idx && (_number[idx] == rv._number[idx])) {
 			--idx;
 		}
@@ -804,7 +792,113 @@ protected:
 
 	constexpr void sign_flip() {
 		bitwise_not();
-		chunk_add_offset(1, 0);
+		chunk_add_offset(1u, 0);
 	}
 
 };
+
+// ----------------------------------------------------------------------------
+// Bitwise operators.
+// ----------------------------------------------------------------------------
+
+// BigInt vs Integer.
+template <size_t W, typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= sizeof(BigInt<W>)), int>::type = 0>
+constexpr BigInt<W> operator&(BigInt<W> left, const T& right) { return left.operator&(BigInt<W>(right));}
+
+template <size_t W, typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= sizeof(BigInt<W>)), int>::type = 0>
+constexpr BigInt<W> operator|(BigInt<W> left, const T& right) { return left.operator|(BigInt<W>(right));}
+
+template <size_t W, typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= sizeof(BigInt<W>)), int>::type = 0>
+constexpr BigInt<W> operator^(BigInt<W> left, const T& right) { return left.operator^(BigInt<W>(right));}
+
+// Integer vs BigInt.
+template <size_t W, typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= sizeof(BigInt<W>)), int>::type = 0>
+constexpr BigInt<W> operator&(const T& left, BigInt<W> right) { return right.operator&(BigInt<W>(left));}
+
+template <size_t W, typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= sizeof(BigInt<W>)), int>::type = 0>
+constexpr BigInt<W> operator|(const T& left, BigInt<W> right) { return right.operator|(BigInt<W>(left));}
+
+template <size_t W, typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= sizeof(BigInt<W>)), int>::type = 0>
+constexpr BigInt<W> operator^(const T& left, BigInt<W> right) { return right.operator^(BigInt<W>(left));}
+
+
+
+// ----------------------------------------------------------------------------
+// Relational operators.
+// ----------------------------------------------------------------------------
+
+// BigInt vs Integer.
+template <size_t W, typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= sizeof(BigInt<W>)), int>::type = 0>
+constexpr bool operator==(const BigInt<W>& left, const T& right) { return left.operator==(BigInt<W>(right)); }
+
+template <size_t W, typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= sizeof(BigInt<W>)), int>::type = 0>
+constexpr bool operator!=(const BigInt<W>& left, const T& right) { return left.operator!=(BigInt<W>(right)); }
+
+template <size_t W, typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= sizeof(BigInt<W>)), int>::type = 0>
+constexpr bool operator<(const BigInt<W>& left, const T& right) { return left.operator<(BigInt<W>(right)); }
+
+template <size_t W, typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= sizeof(BigInt<W>)), int>::type = 0>
+constexpr bool operator>(const BigInt<W>& left, const T& right) { return left.operator>(BigInt<W>(right)); }
+
+template <size_t W, typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= sizeof(BigInt<W>)), int>::type = 0>
+constexpr bool operator<=(const BigInt<W>& left, const T& right) { return left.operator<=(BigInt<W>(right)); }
+
+template <size_t W, typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= sizeof(BigInt<W>)), int>::type = 0>
+constexpr bool operator>=(const BigInt<W>& left, const T& right) { return left.operator>=(BigInt<W>(right)); }
+
+
+// Integer vs BigInt.
+template <size_t W, typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= sizeof(BigInt<W>)), int>::type = 0>
+constexpr bool operator==(const T& left, const BigInt<W>& right) { return right.operator==(BigInt<W>(left)); }
+
+template <size_t W, typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= sizeof(BigInt<W>)), int>::type = 0>
+constexpr bool operator!=(const T& left, const BigInt<W>& right) { return right.operator!=(BigInt<W>(left)); }
+
+template <size_t W, typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= sizeof(BigInt<W>)), int>::type = 0>
+constexpr bool operator<(const T& left, const BigInt<W>& right) { return right.operator>(BigInt<W>(left)); }
+
+template <size_t W, typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= sizeof(BigInt<W>)), int>::type = 0>
+constexpr bool operator>(const T& left, const BigInt<W>& right) { return right.operator<(BigInt<W>(left)); }
+
+template <size_t W, typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= sizeof(BigInt<W>)), int>::type = 0>
+constexpr bool operator<=(const T& left, const BigInt<W>& right) { return right.operator>=(BigInt<W>(left)); }
+
+template <size_t W, typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= sizeof(BigInt<W>)), int>::type = 0>
+constexpr bool operator>=(const T& left, const BigInt<W>& right) { return right.operator<=(BigInt<W>(left)); }
+
+
+// ----------------------------------------------------------------------------
+// Arithmetic operators.
+// ----------------------------------------------------------------------------
+
+// BigInt vs Integer.
+template <size_t W, typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= sizeof(BigInt<W>)), int>::type = 0>
+constexpr BigInt<W> operator+(BigInt<W> left, const T& right) { return left.operator+=(BigInt<W>(right));}
+
+template <size_t W, typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= sizeof(BigInt<W>)), int>::type = 0>
+constexpr BigInt<W> operator-(BigInt<W> left, const T& right) { return left.operator-=(BigInt<W>(right));}
+
+template <size_t W, typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= sizeof(BigInt<W>)), int>::type = 0>
+constexpr BigInt<W> operator*(BigInt<W> left, const T& right) { return left.operator*=(BigInt<W>(right));}
+
+template <size_t W, typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= sizeof(BigInt<W>)), int>::type = 0>
+constexpr BigInt<W> operator/(BigInt<W> left, const T& right) { return left.operator/=(BigInt<W>(right));}
+
+template <size_t W, typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= sizeof(BigInt<W>)), int>::type = 0>
+constexpr BigInt<W> operator%(BigInt<W> left, const T& right) { return left.operator%=(BigInt<W>(right));}
+
+// Integer vs BigInt.
+template <size_t W, typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= sizeof(BigInt<W>)), int>::type = 0>
+constexpr BigInt<W> operator+(const T& left, BigInt<W> right) { return right.operator+=(BigInt<W>(left));}
+
+template <size_t W, typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= sizeof(BigInt<W>)), int>::type = 0>
+constexpr BigInt<W> operator-(const T& left, const BigInt<W>& right) { return BigInt<W>(left).operator-=(right);}
+
+template <size_t W, typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= sizeof(BigInt<W>)), int>::type = 0>
+constexpr BigInt<W> operator*(const T& left, BigInt<W> right) { return right.operator*=(BigInt<W>(left));}
+
+template <size_t W, typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= sizeof(BigInt<W>)), int>::type = 0>
+constexpr BigInt<W> operator/(const T& left, const BigInt<W>& right) { return BigInt<W>(left).operator/=(right);}
+
+template <size_t W, typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= sizeof(BigInt<W>)), int>::type = 0>
+constexpr BigInt<W> operator%(const T& left, const BigInt<W>& right) { return BigInt<W>(left).operator%=(right);}

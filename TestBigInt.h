@@ -9,11 +9,10 @@
 #include <limits>
 #include <cstdio>
 
-//#include <string>
-
 #define ASSERT(exp) { \
 	if(!(exp)) { \
-		printf(#exp "\n"); \
+		printf(#exp "\n");  \
+        printf("The autotest has failed! at line %d!\n", __LINE__);\
 		fflush(stdout); \
 		fflush(stderr); \
 		abort(); \
@@ -22,10 +21,12 @@
 
 class TestBigInt {
 
+	static_assert(sizeof(signed long long) > 1u, "The autotest is useless!");
+
 	static constexpr size_t AUTOTEST_ROUNDS = 100000u;
 	static constexpr size_t PERFORMANCE_TEST_ROUNDS = 100000u;
 
-	template <typename T, size_t BYTES_MAX = sizeof(T), std::enable_if_t<(BYTES_MAX <= sizeof(T)), int> = 0>
+	template <typename T, size_t BYTES_MAX = sizeof(T), std::enable_if_t<((BYTES_MAX <= sizeof(T))), int> = 0>
 	struct RndIntGen {
 		static_assert(RAND_MAX > 0xFF, "rand() range is narrower than one byte.");
 
@@ -43,13 +44,25 @@ class TestBigInt {
 		}
 	};
 
+	template <size_t WIDTH>
+	using NotWiderInteger =
+		typename std::conditional<(sizeof(signed long long) <= WIDTH), signed long long,
+			typename std::conditional<(sizeof(signed long) <= WIDTH), signed long,
+				typename std::conditional<(sizeof(signed int) <= WIDTH), signed int,
+					typename std::conditional<(sizeof(signed short) <= WIDTH), signed short,
+						typename std::conditional<(sizeof(signed char) <= WIDTH), signed char, void>::type
+					>::type
+				>::type
+			>::type
+		>::type;
+
 	using BiChar_t = BigInt<CHAR_BIT>;
 	using BiShort_t = BigInt<sizeof(signed short) * CHAR_BIT>;
 	using BiInt_t = BigInt<sizeof(signed int) * CHAR_BIT>;
 	using BiLong_t = BigInt<sizeof(signed long) * CHAR_BIT>;
 	using BiLongLong_t = BigInt<sizeof(signed long long) * CHAR_BIT>;
 
-#define ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGERS(func, rounds) { \
+#define ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGER(func, rounds) { \
 	printf("->TestBigInt::"#func"()\n"); \
 	func<BiChar_t, signed char>(rounds); \
 	func<BiShort_t, signed short>(rounds); \
@@ -57,6 +70,28 @@ class TestBigInt {
 	func<BiLong_t, signed long>(rounds);\
 	func<BiLongLong_t, signed long long>(rounds); \
 }
+
+#define ITERATE_BIGINT_AND_NOT_WIDER_INTEGER(func, rounds) { \
+	printf("->TestBigInt::"#func"()\n");                        \
+    func<BigInt<(1u * CHAR_BIT)>, NotWiderInteger<1u>>(rounds); \
+	func<BigInt<(2u * CHAR_BIT)>, NotWiderInteger<2u>>(rounds); \
+	func<BigInt<(3u * CHAR_BIT)>, NotWiderInteger<3u>>(rounds); \
+	func<BigInt<(4u * CHAR_BIT)>, NotWiderInteger<4u>>(rounds); \
+	func<BigInt<(5u * CHAR_BIT)>, NotWiderInteger<5u>>(rounds); \
+	func<BigInt<(6u * CHAR_BIT)>, NotWiderInteger<6u>>(rounds); \
+	func<BigInt<(7u * CHAR_BIT)>, NotWiderInteger<7u>>(rounds); \
+	func<BigInt<(8u * CHAR_BIT)>, NotWiderInteger<8u>>(rounds); \
+	func<BigInt<(9u * CHAR_BIT)>, NotWiderInteger<9u>>(rounds); \
+	func<BigInt<(10u * CHAR_BIT)>, NotWiderInteger<10u>>(rounds); \
+	func<BigInt<(11u * CHAR_BIT)>, NotWiderInteger<11u>>(rounds); \
+	func<BigInt<(12u * CHAR_BIT)>, NotWiderInteger<12u>>(rounds); \
+	func<BigInt<(13u * CHAR_BIT)>, NotWiderInteger<13u>>(rounds); \
+	func<BigInt<(14u * CHAR_BIT)>, NotWiderInteger<14u>>(rounds); \
+	func<BigInt<(15u * CHAR_BIT)>, NotWiderInteger<15u>>(rounds); \
+	func<BigInt<(16u * CHAR_BIT)>, NotWiderInteger<16u>>(rounds); \
+	func<BigInt<(17u * CHAR_BIT)>, NotWiderInteger<17u>>(rounds); \
+}
+
 
 #define ITERATE_BIGINT_AND_WIDER_BIGINT(func, rounds) { \
 printf("->TestBigInt::"#func"()\n"); \
@@ -78,38 +113,52 @@ public:
 		srand(0);
 
 		// Type conversion tests.
-		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGERS(test_load_store_int, AUTOTEST_ROUNDS);
+		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGER(test_load_store_int, AUTOTEST_ROUNDS);
+		ITERATE_BIGINT_AND_NOT_WIDER_INTEGER(test_load_store_int, AUTOTEST_ROUNDS);
 		ITERATE_BIGINT_AND_WIDER_BIGINT(test_load_store_big_int, AUTOTEST_ROUNDS);
-		test_type_conversion_bigint_int();
-		test_type_conversion_bigint_bigint();
+		test_type_conversion_int_to_bigint();
 
 		// Test BigInt arithmetic operations comparing the results with the equal sized integral integer types.
-		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGERS(test_min_max, AUTOTEST_ROUNDS);
-		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGERS(test_bitwise, AUTOTEST_ROUNDS);
-		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGERS(test_shift, AUTOTEST_ROUNDS);
-		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGERS(test_relational, AUTOTEST_ROUNDS);
-		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGERS(test_add_sub, AUTOTEST_ROUNDS);
-		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGERS(test_mult, AUTOTEST_ROUNDS);
-		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGERS(test_div_mod, AUTOTEST_ROUNDS);
-		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGERS(test_sign_change, AUTOTEST_ROUNDS);
+		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGER(test_cmp_int_min_max, AUTOTEST_ROUNDS);
+		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGER(test_cmp_int_bitwise, AUTOTEST_ROUNDS);
+		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGER(test_cmp_int_shift, AUTOTEST_ROUNDS);
+		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGER(test_cmp_int_relational, AUTOTEST_ROUNDS);
+		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGER(test_cmp_int_add_sub, AUTOTEST_ROUNDS);
+		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGER(test_cmp_int_mult, AUTOTEST_ROUNDS);
+		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGER(test_cmp_int_div_mod, AUTOTEST_ROUNDS);
+		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGER(test_cmp_int_sign_change, AUTOTEST_ROUNDS);
+
+		ITERATE_BIGINT_AND_NOT_WIDER_INTEGER(test_cmp_int_bitwise, AUTOTEST_ROUNDS);
+		ITERATE_BIGINT_AND_NOT_WIDER_INTEGER(test_cmp_int_shift, AUTOTEST_ROUNDS);
+		ITERATE_BIGINT_AND_NOT_WIDER_INTEGER(test_cmp_int_relational, AUTOTEST_ROUNDS);
+		ITERATE_BIGINT_AND_NOT_WIDER_INTEGER(test_cmp_int_add_sub, AUTOTEST_ROUNDS);
+		ITERATE_BIGINT_AND_NOT_WIDER_INTEGER(test_cmp_int_mult, AUTOTEST_ROUNDS);
+		ITERATE_BIGINT_AND_NOT_WIDER_INTEGER(test_cmp_int_div_mod, AUTOTEST_ROUNDS);
+		ITERATE_BIGINT_AND_NOT_WIDER_INTEGER(test_cmp_int_sign_change, AUTOTEST_ROUNDS);
 
 		test_constexpr_values();
 
-		test_performance_reference_all(PERFORMANCE_TEST_ROUNDS);
-
-		test_performance<BigInt<CHAR_BIT * 1u>>(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 2u>>(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 3u>>(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 4u>>(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 5u>>(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 6u>>(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 7u>>(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 8u>>(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 10u>>(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 15u>>(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 16u>>(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 48u>>(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 256u>>(PERFORMANCE_TEST_ROUNDS);
+//		printf("---- Built-in integers section. ----\n");
+//		test_performance<signed char>(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<signed short>(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<signed int>(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<signed long>(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<signed long long>(PERFORMANCE_TEST_ROUNDS);
+//
+//		printf("---- BigInt section. ----\n");
+//		test_performance<BigInt<CHAR_BIT * 1u>>(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<BigInt<CHAR_BIT * 2u>>(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<BigInt<CHAR_BIT * 3u>>(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<BigInt<CHAR_BIT * 4u>>(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<BigInt<CHAR_BIT * 5u>>(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<BigInt<CHAR_BIT * 6u>>(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<BigInt<CHAR_BIT * 7u>>(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<BigInt<CHAR_BIT * 8u>>(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<BigInt<CHAR_BIT * 10u>>(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<BigInt<CHAR_BIT * 15u>>(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<BigInt<CHAR_BIT * 16u>>(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<BigInt<CHAR_BIT * 48u>>(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<BigInt<CHAR_BIT * 256u>>(PERFORMANCE_TEST_ROUNDS);
 	}
 
 	template <typename BigType_t, typename Integer>
@@ -132,7 +181,7 @@ public:
 	template <typename BigType_t, typename Integer>
 	void test_load_store_int_value(BigType_t& bint, const Integer& int_ref) {
 		bint = int_ref;
-		const Integer int_out = bint;
+		const auto int_out = static_cast<Integer>(bint);
 		ASSERT(int_out == int_ref);
 	}
 
@@ -160,7 +209,7 @@ public:
 		ASSERT(a_in == a_out);
 		ASSERT(a_out == a_in);
 
-		b_in = a_in;
+		b_in = B(a_in);
 		a_out = A(b_in);
 		ASSERT(a_in == a_out);
 		ASSERT(a_out == a_in);
@@ -173,137 +222,88 @@ public:
 	static signed short get_short()  { return 0; }
 	static signed int   get_int()    { return 0; }
 	static signed long  get_long()   { return 0; }
+	static signed long long  get_long_long()   { return 0; }
 
-	static void set_char(signed char)   {}
-	static void set_short(signed short) {}
-	static void set_int(signed int)     {}
-	static void set_long(signed long)   {}
-
-	static void test_type_conversion_bigint_int() {
-		printf("->TestBigInt::test_type_conversion_bigint_int()\n");
-
-		// Integer to BigInt.
+	static void test_type_conversion_int_to_bigint() {
+		printf("->TestBigInt::test_type_conversion_int_to_bigint()\n");
 
 		// Wider to narrower. Explicit conversion.
-		BiChar_t bic(get_long());
-		BiShort_t bis(get_long());
-		BiInt_t bii(get_long());
-		BiLong_t bil(get_long());
+		BiChar_t bi_char(get_long());
+		BiShort_t bi_short(get_long());
+		BiInt_t bi_int(get_long());
+		BiLong_t bi_long(get_long());
+		BiLongLong_t bi_long_long(get_long_long());
 
 		// Implicit conversion. Narrower to wider.
-		bic = get_char();
-		bis = get_char();
-		bii = get_char();
-		bil = get_char();
+		bi_char = get_char();
+		bi_short = get_char();
+		bi_int = get_char();
+		bi_int = get_char();
+		bi_long_long = get_char();
 
-//		bic = get_short(); Is not allowed if sizeof(short) > 1u.
-		bis = get_short();
-		bii = get_short();
-		bil = get_short();
+//		bi_char = get_short(); Is not allowed if sizeof(short) > 1u.
+		bi_short = get_short();
+		bi_int = get_short();
+		bi_long = get_short();
+		bi_long_long = get_short();
 
-//		bic = get_int(); Is not allowed if sizeof(int) > 1u.
-//		bis = get_int(); Is not allowed if sizeof(int) > sizeof(short).
-		bii = get_int();
-		bil = get_int();
+//		bi_char = get_int(); Is not allowed if sizeof(int) > 1u.
+//		bi_short = get_int(); Is not allowed if sizeof(int) > sizeof(short).
+		bi_int = get_int();
+		bi_long = get_int();
+		bi_long_long = get_int();
 
-//		bic = get_long(); Is not allowed if sizeof(long) > 1u.
-//		bis = get_long(); Is not allowed if sizeof(long) > sizeof(short).
-//		bii = get_long(); Is not allowed if sizeof(long) > sizeof(int).
-		bil = get_long();
+//		bi_char = get_long(); Is not allowed if sizeof(long) > 1u.
+//		bi_short = get_long(); Is not allowed if sizeof(long) > sizeof(short).
+//		bi_int = get_long(); Is not allowed if sizeof(long) > sizeof(int).
+		bi_long = get_long();
+		bi_long_long = get_long();
+
+//		bi_char = get_long_long(); Is not allowed if sizeof(long long) > 1u.
+//		bi_short = get_long_long(); Is not allowed if sizeof(long long) > sizeof(short).
+//		bi_int = get_long_long(); Is not allowed if sizeof(long long) > sizeof(int).
+//		bi_long = get_long_long(); Is not allowed if sizeof(long long) > sizeof(long).
+		bi_long_long = get_long_long();
 
 		// Explicit conversion.
-		bic = BiChar_t(get_short());
-		bic = BiChar_t(get_int());
-		bic = BiChar_t(get_long());
-		bis = BiShort_t(get_int());
-		bis = BiShort_t(get_long());
-		bii = BiInt_t(get_long());
-		bil = BiLong_t(get_long());
+		bi_char = BiChar_t(get_short());
+		bi_char = BiChar_t(get_int());
+		bi_char = BiChar_t(get_long());
+		bi_char = BiChar_t(get_long_long());
+		bi_short = BiShort_t(get_int());
+		bi_short = BiShort_t(get_long());
+		bi_short = BiShort_t(get_long_long());
+		bi_int = BiInt_t(get_long());
+		bi_int = BiInt_t(get_long_long());
+		bi_long = BiLong_t(get_long_long());
 
-		bic = static_cast<BiChar_t>(get_short());
-		bic = static_cast<BiChar_t>(get_int());
-		bic = static_cast<BiChar_t>(get_long());
-		bis = static_cast<BiShort_t>(get_int());
-		bis = static_cast<BiShort_t>(get_long());
-		bii = static_cast<BiInt_t>(get_long());
-		bil = static_cast<BiLong_t>(get_long());
-
-		// BigInt to integer.
-		set_char(bic);
-		set_short(bic);
-		set_int(bic);
-		set_long(bic);
-
-//		set_char(bis); Is not allowed if sizeof(short) > 1u.
-		set_short(bis);
-		set_int(bis);
-		set_long(bis);
-
-//		set_char(bii); Is not allowed if sizeof(int) > 1u.
-//		set_short(bii); Is not allowed if sizeof(int) > sizeof(short).
-		set_int(bii);
-		set_long(bii);
-
-//		set_char(bil); Is not allowed if sizeof(long) > 1u.
-//		set_short(bil); Is not allowed if sizeof(long) > sizeof(short).
-//		set_int(bil); Is not allowed if sizeof(long) > sizeof(int).
-		set_long(bil);
-	}
-
-	static BiChar_t  get_bi_char()  { return BiChar_t(0);  }
-	static BiShort_t get_bi_short() { return BiShort_t(0); }
-	static BiInt_t   get_bi_int()   { return BiInt_t(0);   }
-	static BiLong_t  get_bi_long()  { return BiLong_t(0);  }
-
-	static void set_bi_char(BiChar_t)   {}
-	static void set_bi_short(BiShort_t) {}
-	static void set_bi_int(BiInt_t )    {}
-	static void set_bi_long(BiLong_t)    {}
-
-	static void test_type_conversion_bigint_bigint() {
-		printf("->TestBigInt::test_type_conversion_bigint_bigint()\n");
-
-		BiChar_t bic;
-		BiShort_t bis;
-		BiInt_t bii;
-		BiLong_t bil;
-
-		set_bi_char(bic);
-//		set_bi_char(bis); Is not allowed if sizeof(short) > 1u.
-//		set_bi_char(bii); Is not allowed if sizeof(int) > 1u.
-//		set_bi_char(bil); Is not allowed if sizeof(long) > 1u.
-
-		set_bi_short(bic);
-		set_bi_short(bis);
-//		set_bi_short(bii); Is not allowed if sizeof(int) > sizeof(short).
-//		set_bi_short(bil); Is not allowed if sizeof(long) > sizeof(short).
-
-		set_bi_int(bic);
-		set_bi_int(bis);
-		set_bi_int(bii);
-//		set_bi_int(bil); Is not allowed if sizeof(long) > sizeof(int).
-
-		set_bi_long(bic);
-		set_bi_long(bis);
-		set_bi_long(bii);
-		set_bi_long(bil);
+		bi_char = static_cast<BiChar_t>(get_short());
+		bi_char = static_cast<BiChar_t>(get_int());
+		bi_char = static_cast<BiChar_t>(get_long());
+		bi_char = static_cast<BiChar_t>(get_long_long());
+		bi_short = static_cast<BiShort_t>(get_int());
+		bi_short = static_cast<BiShort_t>(get_long());
+		bi_short = static_cast<BiShort_t>(get_long_long());
+		bi_int = static_cast<BiInt_t>(get_long());
+		bi_int = static_cast<BiInt_t>(get_long_long());
+		bi_long = static_cast<BiLong_t>(get_long_long());
 
 	}
 
 	template <typename BigType_t, typename Integer>
-	void test_min_max(size_t) {
+	void test_cmp_int_min_max(size_t) {
 		static_assert(BigType_t::NUMBER_WIDTH_BYTES == sizeof(Integer), "Size assert");
 		const auto bmin = BigType_t::min();
 		const auto bmax = BigType_t::max();
-		Integer imin = bmin;
-		Integer imax = bmax;
+		const auto imin = static_cast<Integer>(bmin);
+		const auto imax = static_cast<Integer>(bmax);
 		ASSERT(imin == std::numeric_limits<Integer>::min());
 		ASSERT(imax == std::numeric_limits<Integer>::max());
 	}
 
 	template <typename BigType_t, typename Integer>
-	void test_bitwise(size_t rounds) {
-		static_assert(BigType_t::NUMBER_WIDTH_BYTES == sizeof(Integer), "Size assert");
+	void test_cmp_int_bitwise(size_t rounds) {
+		static_assert(BigType_t::NUMBER_WIDTH_BYTES >= sizeof(Integer), "Size assert");
 		RndIntGen<Integer> gen;
 		BigType_t bx;
 		BigType_t by;
@@ -318,9 +318,21 @@ public:
 			test_equal<BigType_t, Integer>(by, iy);
 			test_equal<BigType_t, Integer>(~bx, ~ix);
 			test_equal<BigType_t, Integer>(~by, ~iy);
+
 			test_equal<BigType_t, Integer>((bx | by), (ix | iy));
+			test_equal<BigType_t, Integer>((by | bx), (iy | ix));
+			test_equal<BigType_t, Integer>((bx | iy), (ix | iy));
+			test_equal<BigType_t, Integer>((ix | by), (ix | iy));
+
 			test_equal<BigType_t, Integer>((bx & by), (ix & iy));
+			test_equal<BigType_t, Integer>((by & bx), (iy & ix));
+			test_equal<BigType_t, Integer>((bx & iy), (ix & iy));
+			test_equal<BigType_t, Integer>((ix & by), (ix & iy));
+
 			test_equal<BigType_t, Integer>((bx ^ by), (ix ^ iy));
+			test_equal<BigType_t, Integer>((by ^ bx), (iy ^ ix));
+			test_equal<BigType_t, Integer>((bx ^ iy), (ix ^ iy));
+			test_equal<BigType_t, Integer>((ix ^ by), (ix ^ iy));
 
 			bop = bx;
 			iop = ix;
@@ -343,8 +355,8 @@ public:
 	}
 
 	template <typename BigType_t, typename Integer>
-	void test_shift(size_t rounds) {
-		static_assert(BigType_t::NUMBER_WIDTH_BYTES == sizeof(Integer), "Size assert");
+	void test_cmp_int_shift(size_t rounds) {
+		static_assert(BigType_t::NUMBER_WIDTH_BYTES >= sizeof(Integer), "Size assert");
 		RndIntGen<Integer> gen;
 		RndIntGen<size_t, 1u> gen_shift;
 		BigType_t bx;
@@ -363,8 +375,8 @@ public:
 			iop <<= shift;
 			test_equal<BigType_t, Integer>(bop, iop);
 
-			test_equal<BigType_t, Integer>(bx << BigType_t::NUMBER_WIDTH_BITS, BigType_t(0));
-			test_equal<BigType_t, Integer>(bx.shr(BigType_t::NUMBER_WIDTH_BITS), BigType_t(0));
+			test_equal<BigType_t, Integer>(bx << BigType_t::NUMBER_WIDTH_BITS, 0);
+			test_equal<BigType_t, Integer>(bx.shr(BigType_t::NUMBER_WIDTH_BITS), 0);
 
 			// Since right shift operation of a signed integer produces a platform dependent result,
 			// we cannot compare BigInt behaviour with the integral integer types.
@@ -380,8 +392,8 @@ public:
 	}
 
 	template <typename BigType_t, typename Integer>
-	void test_relational(size_t rounds) {
-		static_assert(BigType_t::NUMBER_WIDTH_BYTES == sizeof(Integer), "Size assert");
+	void test_cmp_int_relational(size_t rounds) {
+		static_assert(BigType_t::NUMBER_WIDTH_BYTES >= sizeof(Integer), "Size assert");
 		RndIntGen<Integer> gen;
 		BigType_t bx;
 		BigType_t by;
@@ -395,23 +407,50 @@ public:
 
 			ASSERT((bx == by) == (ix == iy));
 			ASSERT((by == bx) == (iy == ix));
+			ASSERT((bx == iy) == (ix == iy));
+			ASSERT((ix == by) == (ix == iy));
+
 			ASSERT((bx != by) == (ix != iy));
 			ASSERT((by != bx) == (iy != ix));
+			ASSERT((bx != iy) == (ix != iy));
+			ASSERT((ix != by) == (ix != iy));
+
 			ASSERT((bx > by) == (ix > iy));
 			ASSERT((by > bx) == (iy > ix));
+			ASSERT((bx > iy) == (ix > iy));
+			ASSERT((ix > by) == (ix > iy));
+
 			ASSERT((bx < by) == (ix < iy));
 			ASSERT((by < bx) == (iy < ix));
+			ASSERT((bx < iy) == (ix < iy));
+			ASSERT((ix < by) == (ix < iy));
+
 			ASSERT((bx >= by) == (ix >= iy));
 			ASSERT((by >= bx) == (iy >= ix));
+			ASSERT((bx >= iy) == (ix >= iy));
+			ASSERT((ix >= by) == (ix >= iy));
+
 			ASSERT((bx <= by) == (ix <= iy));
 			ASSERT((by <= bx) == (iy <= ix));
+			ASSERT((bx <= iy) == (ix <= iy));
+			ASSERT((ix <= by) == (ix <= iy));
 
 		}
 	}
 
 	template <typename BigType_t, typename Integer>
-	void test_add_sub(size_t rounds) {
-		static_assert(BigType_t::NUMBER_WIDTH_BYTES == sizeof(Integer), "Size assert");
+	void test_cmp_int_add_sub(size_t rounds) {
+		static_assert(BigType_t::NUMBER_WIDTH_BYTES >= sizeof(Integer), "Size assert");
+
+		test_equal(BigType_t(-1), Integer(-1));
+		test_equal(BigType_t(0), Integer(0));
+		test_equal(BigType_t(1), Integer(1));
+
+		test_equal(BigType_t::max() + Integer(1), BigType_t::min());
+		test_equal(BigType_t::min() - Integer(1), BigType_t::max());
+		test_equal(++BigType_t::max(), BigType_t::min());
+		test_equal(--BigType_t::min(), BigType_t::max());
+
 		RndIntGen<Integer> gen;
 		BigType_t bx;
 		BigType_t by;
@@ -424,10 +463,12 @@ public:
 			by = iy;
 			test_equal<BigType_t, Integer>(bx, ix);
 			test_equal<BigType_t, Integer>(by, iy);
+
+			// add
 			test_equal<BigType_t, Integer>(bx + by, ix + iy);
 			test_equal<BigType_t, Integer>(by + bx, iy + ix);
-			test_equal<BigType_t, Integer>(bx - by, ix - iy);
-			test_equal<BigType_t, Integer>(by - bx, iy - ix);
+			test_equal<BigType_t, Integer>(bx + iy, ix + iy);
+			test_equal<BigType_t, Integer>(ix + by, ix + iy);
 
 			bop = bx;
 			iop = ix;
@@ -435,17 +476,50 @@ public:
 			iop += iy;
 			test_equal<BigType_t, Integer>(bop, iop);
 
+			// sub
+			test_equal<BigType_t, Integer>(bx - by, ix - iy);
+			test_equal<BigType_t, Integer>(by - bx, iy - ix);
+			test_equal<BigType_t, Integer>(bx - iy, ix - iy);
+			test_equal<BigType_t, Integer>(ix - by, ix - iy);
+
 			bop = bx;
 			iop = ix;
 			bop -= by;
 			iop -= iy;
 			test_equal<BigType_t, Integer>(bop, iop);
+
+			// inc
+			bop = bx;
+			iop = ix;
+			++bop;
+			++iop;
+			test_equal<BigType_t, Integer>(bop, iop);
+
+			bop = bx;
+			iop = ix;
+			bop++;
+			iop++;
+			test_equal<BigType_t, Integer>(bop, iop);
+
+			// dec
+			bop = bx;
+			iop = ix;
+			--bop;
+			--iop;
+			test_equal<BigType_t, Integer>(bop, iop);
+
+			bop = bx;
+			iop = ix;
+			bop--;
+			iop--;
+			test_equal<BigType_t, Integer>(bop, iop);
+
 		}
 	}
 
 	template <typename BigType_t, typename Integer>
-	void test_mult(size_t rounds) {
-		static_assert(BigType_t::NUMBER_WIDTH_BYTES == sizeof(Integer), "Size assert");
+	void test_cmp_int_mult(size_t rounds) {
+		static_assert(BigType_t::NUMBER_WIDTH_BYTES >= sizeof(Integer), "Size assert");
 		RndIntGen<Integer> gen;
 		BigType_t bx;
 		BigType_t by;
@@ -457,10 +531,20 @@ public:
 			bx = ix;
 			by = iy;
 //			printf("ix=%s iy=%s\n", std::to_string(ix).c_str(), std::to_string(iy).c_str());
+
+			test_equal<BigType_t, Integer>(bx * BigType_t(0), Integer(0));
+			test_equal<BigType_t, Integer>(by * BigType_t(0), Integer(0));
+			test_equal<BigType_t, Integer>(bx * BigType_t(1), ix);
+			test_equal<BigType_t, Integer>(by * BigType_t(1), iy);
+			test_equal<BigType_t, Integer>(bx * BigType_t(-1), -ix);
+			test_equal<BigType_t, Integer>(by * BigType_t(-1), -iy);
+
 			test_equal<BigType_t, Integer>(bx, ix);
 			test_equal<BigType_t, Integer>(by, iy);
 			test_equal<BigType_t, Integer>(bx * by, ix * iy);
 			test_equal<BigType_t, Integer>(by * bx, iy * ix);
+			test_equal<BigType_t, Integer>(bx * iy, ix * iy);
+			test_equal<BigType_t, Integer>(ix * by, ix * iy);
 
 			bop = bx;
 			iop = ix;
@@ -471,10 +555,11 @@ public:
 	}
 
 	template <typename BigType_t, typename Integer>
-	void test_div_mod(size_t rounds) {
-		static_assert(BigType_t::NUMBER_WIDTH_BYTES == sizeof(Integer), "Size assert");
+	void test_cmp_int_div_mod(size_t rounds) {
+		static_assert(BigType_t::NUMBER_WIDTH_BYTES >= sizeof(Integer), "Size assert");
 		RndIntGen<Integer> gen;
 		RndIntGen<Integer, (sizeof(Integer) / 2u + 1u)> gen_sqrt;
+
 		BigType_t bx;
 		BigType_t by;
 		BigType_t bop;
@@ -488,10 +573,23 @@ public:
 			bx = ix;
 			by = iy;
 //			printf("ix=%s / iy=%s 0x%X / 0x%x\n", std::to_string(ix).c_str(), std::to_string(iy).c_str(), ix, iy);
+			test_equal<BigType_t, Integer>(bx / BigType_t(1), ix);
+			test_equal<BigType_t, Integer>(by / BigType_t(1), iy);
+			test_equal<BigType_t, Integer>(bx / BigType_t(-1), -ix);
+			test_equal<BigType_t, Integer>(by / BigType_t(-1), -iy);
+			test_equal<BigType_t, Integer>(by / by, Integer(1));
+			test_equal<BigType_t, Integer>((-by) / (-by), Integer(1));
+
 			test_equal<BigType_t, Integer>(bx, ix);
 			test_equal<BigType_t, Integer>(by, iy);
+
 			test_equal<BigType_t, Integer>(bx / by, ix / iy);
+			test_equal<BigType_t, Integer>(bx / iy, ix / iy);
+			test_equal<BigType_t, Integer>(ix / by, ix / iy);
+
 			test_equal<BigType_t, Integer>(bx % by, ix % iy);
+			test_equal<BigType_t, Integer>(bx % iy, ix % iy);
+			test_equal<BigType_t, Integer>(ix % by, ix % iy);
 
 			bop = bx;
 			iop = ix;
@@ -508,8 +606,9 @@ public:
 	}
 
 	template <typename BigType_t, typename Integer>
-	void test_sign_change(size_t rounds) {
-		static_assert(BigType_t::NUMBER_WIDTH_BYTES == sizeof(Integer), "Size assert");
+	void test_cmp_int_sign_change(size_t rounds) {
+		static_assert(BigType_t::NUMBER_WIDTH_BYTES >= sizeof(Integer), "Size assert");
+
 		RndIntGen<Integer> gen;
 		BigType_t bx;
 		while(rounds--) {
@@ -521,11 +620,20 @@ public:
 		}
 	}
 
-	template <typename BigType_t, typename Integer>
+	template <typename BigType_t, typename Integer, typename std::enable_if<(sizeof(BigType_t) == sizeof(Integer)), int>::type = 0>
 	static void test_equal(const BigType_t& big_int, const Integer& int_ref) {
-		Integer int_out = big_int;
+		const auto int_out = static_cast<Integer>(big_int);
 		ASSERT(int_out == int_ref);
 		ASSERT(big_int == int_ref);
+		ASSERT(big_int == int_out);
+		ASSERT(int_ref == big_int);
+		ASSERT(int_out == big_int);
+	}
+
+	template <typename BigType_t, typename Integer, typename std::enable_if<(sizeof(BigType_t) > sizeof(Integer)), int>::type = 0>
+	static void test_equal(const BigType_t& big_int, const Integer& int_ref) {
+		const auto int_out = static_cast<Integer>(big_int);
+		ASSERT(int_out == int_ref);
 	}
 
 	void test_constexpr_values() {
@@ -536,9 +644,9 @@ public:
 		static constexpr BiLong_t BI_LONG = 0x0ABC;
 
 		static_assert((BI_CHAR + BiChar_t(1)) == 'B', "_");
-//		static_assert((BI_CHAR | (signed char)('A')) == (signed char)('A'), "_");
-//		static_assert((BI_CHAR & 'A') == 'A', "_");
-//		static_assert((BI_CHAR ^ 'A') == BiChar_t(0), "_");
+		static_assert((BI_CHAR | 'A') == 'A', "_");
+		static_assert((BI_CHAR & 'A') == 'A', "_");
+		static_assert((BI_CHAR ^ 'A') == BiChar_t(0), "_");
 		static_assert(BI_SHORT + BiShort_t(1) == BiShort_t(0), "_");
 		static_assert((BI_INT - 1) == 0x7E, "_");
 		static_assert((BI_INT * 16) == 0x7F0, "_");
@@ -546,8 +654,8 @@ public:
 		static_assert((BI_INT ^ 0x7F) == 0, "_");
 		static_assert((BI_INT | 0x80) == 0xFF, "_");
 		static_assert((BI_INT & 0x80) == 0, "_");
-		static_assert(BI_LONG >> 4u == 0xAB, "_");
-		static_assert(BI_LONG << 4u == 0xABC0, "_");
+		static_assert((BI_LONG >> 4u) == 0xAB, "_");
+		static_assert((BI_LONG << 4u) == 0xABC0, "_");
 	}
 
 	// -----------------------------------------------------------------------
@@ -555,31 +663,11 @@ public:
 	// -----------------------------------------------------------------------
 	template <typename BigType_t>
 	void test_performance(size_t rounds) {
-		printf("Performance test BigInt<%zu>.\n", BigType_t::NUMBER_WIDTH_BITS );
+		printf("Performance test %zu bit signed integer.\n", sizeof(BigType_t) * CHAR_BIT);
 		size_t result = 0;
 		result += test_performance_add_sub<BigType_t>(rounds);
 		result += test_performance_mult<BigType_t>(rounds);
 		result += test_performance_div<BigType_t>(rounds);
-		printf("Performance test finishes with checksum %zu.\n\n", result);
-	}
-
-	void test_performance_reference_all(size_t rounds) {
-		test_performance_reference<signed char>(rounds);
-		test_performance_reference<signed short>(rounds);
-		test_performance_reference<signed int>(rounds);
-		test_performance_reference<signed long>(rounds);
-		test_performance_reference<signed long long>(rounds);
-	}
-
-	template <typename Integer_t>
-	void test_performance_reference(size_t rounds) {
-		printf("Performance test %zu bit signed integer.\n", sizeof(Integer_t) * CHAR_BIT);
-
-		size_t result = 0;
-		result += test_performance_add_sub<Integer_t>(rounds);
-		result += test_performance_mult<Integer_t>(rounds);
-		result += test_performance_div<Integer_t>(rounds);
-
 		printf("Performance test finishes with checksum %zu.\n\n", result);
 	}
 
