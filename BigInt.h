@@ -1,9 +1,16 @@
-#pragma once
+#ifndef H_BIG_INT
+#define H_BIG_INT
 
 #include <cstddef>
 #include <cstdint>
 #include <type_traits>
 #include <climits>
+
+// TODO: constexpr switch c11/c14+
+// TODO: arm performance test
+// TODO: compile explorer tests
+// TODO: string parse / write
+// TODO: how to use
 
 /**
  * @tparam WIDTH_BITS
@@ -595,9 +602,10 @@ protected:
 
 					if(offset < (NUMBER_WIDTH_CHUNKS - 1u)) {
 						const UChunk chunk_xh_yh = chunk_xh * chunk_yh;
-						acc.chunk_add_offset(chunk_xl_yh >> HALF_CHUNK_WIDTH_BITS, offset + 1u);
-						acc.chunk_add_offset(chunk_xh_yl >> HALF_CHUNK_WIDTH_BITS, offset + 1u);
-						acc.chunk_add_offset(chunk_xh_yh, offset + 1u);
+						const size_t offset_next = offset + 1u;
+						acc.chunk_add_offset(chunk_xl_yh >> HALF_CHUNK_WIDTH_BITS, offset_next);
+						acc.chunk_add_offset(chunk_xh_yl >> HALF_CHUNK_WIDTH_BITS, offset_next);
+						acc.chunk_add_offset(chunk_xh_yh, offset_next);
 					}
 				}
 			}
@@ -624,9 +632,10 @@ protected:
 
 			if(idx < (NUMBER_WIDTH_CHUNKS - 1u)) {
 				const UChunk chunk_xh_yh = chunk_xh * chunk_yh;
-				acc.chunk_add_offset(chunk_xl_yh >> HALF_CHUNK_WIDTH_BITS, idx + 1u);
-				acc.chunk_add_offset(chunk_xh_yl >> HALF_CHUNK_WIDTH_BITS, idx + 1u);
-				acc.chunk_add_offset(chunk_xh_yh, idx + 1u);
+				const size_t idx_next = idx + 1u;
+				acc.chunk_add_offset(chunk_xl_yh >> HALF_CHUNK_WIDTH_BITS, idx_next);
+				acc.chunk_add_offset(chunk_xh_yl >> HALF_CHUNK_WIDTH_BITS, idx_next);
+				acc.chunk_add_offset(chunk_xh_yh, idx_next);
 			}
 		}
 		*this = acc;
@@ -663,10 +672,10 @@ protected:
 
 			while(shift_hd < HALF_WIDTH_CHUNKS) {
 				if(carry) {
-					const size_t idx_hlf_prev = idx_hlf + 1u;
+					const size_t idx_hlf_next = idx_hlf + 1u;
 
-					while(half_chunk(idx_hlf_prev)) {
-						const UChunk div_floor = full_chunk(idx_hlf_prev) / (denom.half_chunk(idx_hlf) + 1u);
+					while(half_chunk(idx_hlf_next)) {
+						const UChunk div_floor = full_chunk(idx_hlf_next) / (denom.half_chunk(idx_hlf) + 1u);
 						BigInt mult_result = denom;
 						mult_result.mult_chunk(div_floor);
 						result.chunk_add_offset(div_floor, 0);
@@ -902,3 +911,5 @@ constexpr BigInt<W> operator/(const T& left, const BigInt<W>& right) { return Bi
 
 template <size_t W, typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= sizeof(BigInt<W>)), int>::type = 0>
 constexpr BigInt<W> operator%(const T& left, const BigInt<W>& right) { return BigInt<W>(left).operator%=(right);}
+
+#endif // H_BIG_INT
