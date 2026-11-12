@@ -24,7 +24,7 @@ class TestBigInt {
 	static constexpr size_t AUTOTEST_ROUNDS = 100000u;
 	static constexpr size_t PERFORMANCE_TEST_ROUNDS = 100000u;
 
-	template <typename T, size_t BYTES_MAX = sizeof(T), std::enable_if_t<((BYTES_MAX <= sizeof(T))), int> = 0>
+	template <typename T, size_t BYTES_MAX = sizeof(T), typename std::enable_if<((BYTES_MAX <= sizeof(T))), int>::type = 0>
 	struct RndIntGen {
 		static_assert(RAND_MAX > 0xFF, "rand() range is narrower than one byte.");
 
@@ -637,6 +637,7 @@ public:
 	}
 
 	void test_constexpr_values() {
+#if __cplusplus >= 201402L
 		printf("->TestBigInt::test_constexpr_values()\n");
 		static constexpr BiChar_t BI_CHAR = 'A';
 		static constexpr BiShort_t BI_SHORT = short(-1);
@@ -656,6 +657,7 @@ public:
 		static_assert((BI_INT & 0x80) == 0, "_");
 		static_assert((BI_LONG >> 4u) == 0xAB, "_");
 		static_assert((BI_LONG << 4u) == 0xABC0, "_");
+#endif
 	}
 
 	// -----------------------------------------------------------------------
