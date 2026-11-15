@@ -38,8 +38,6 @@ struct BigInt {
 	static_assert(WIDTH_BITS > 0, "BigInt: WIDTH_BITS must be greater than zero!");
 	static_assert((WIDTH_BITS % CHAR_BIT) == 0, "BigInt: WIDTH_BITS must be a multiple of CHAR_BIT!");
 
-	static BIG_INT_CONSTEXPR const char* HEX_DIGITS = "0123456789abcdef";
-
 	template <size_t W>
 	friend struct BigInt;
 
@@ -392,6 +390,8 @@ struct BigInt {
 
 	// Store string.
 	std::string store_hex_str() const {
+		static constexpr char HEX_DIGITS[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+
 		BigInt val(*this);
 		std::string result;
 		do {
@@ -403,7 +403,9 @@ struct BigInt {
 	}
 
 	std::string store_dec_str() const {
-		static BIG_INT_CONSTEXPR const BigInt denom(10);
+		static constexpr char DEC_DIGITS[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '?', '?', '?', '?', '?', '?'};
+
+		static BIG_INT_CONSTEXPR BigInt denom(10);
 		BigInt val(*this);
 		const bool msbit = val.msbit();
 		if(msbit) {
@@ -413,7 +415,7 @@ struct BigInt {
 		std::string result;
 		do {
 			const BigInt div_result = val.div_unsigned(denom);
-			result.push_back(HEX_DIGITS[(val.number[0] & 0xF)]);
+			result.push_back(DEC_DIGITS[(val.number[0] & 0xF)]);
 			val = div_result;
 		} while(val.valuable_chunks());
 		if(msbit) {
@@ -556,7 +558,7 @@ protected:
 
 	// Load string.
 	BIG_INT_CONSTEXPR size_t load_dec_str_unsigned(const char* str) {
-		BIG_INT_CONSTEXPR const BigInt LIMIT_MULT_10(BigInt(-1).div_unsigned(BigInt(10)));
+		BIG_INT_CONSTEXPR BigInt LIMIT_MULT_10(BigInt(-1).div_unsigned(BigInt(10)));
 		const char* const str_begin = str;
 		clear();
 		auto ch_idx = parse_dec_char(*str);
