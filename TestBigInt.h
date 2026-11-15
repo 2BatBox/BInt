@@ -255,6 +255,11 @@ public:
 		const std::string str_hex_in = hex_in.store_hex_str();
 		ASSERT(str_hex_in == str_hex_out);
 
+		// common
+		ASSERT(hex_in.load_str(str_dec_in.c_str()));
+		ASSERT(hex_in == bint);
+
+		ASSERT(hex_in.load_str(str_hex_out.c_str()));
 		ASSERT(hex_in == bint);
 	}
 
@@ -769,12 +774,13 @@ public:
 	void test_constexpr_values() {
 #if __cplusplus >= 201402L
 		printf("->TestBigInt::test_constexpr_values()\n");
-		static constexpr BiChar_t BI_CHAR = 'A';
+		static constexpr BiChar_t BI_CHAR('A');
+		static constexpr BiChar_t BI_CHAR_NEXT = 'B';
 		static constexpr BiShort_t BI_SHORT = short(-1);
-		static constexpr BiInt_t BI_INT = 0x7F;
+		static constexpr BiInt_t BI_INT("0x7F");
 		static constexpr BiLong_t BI_LONG = 0x0ABC;
 
-		static_assert((BI_CHAR + BiChar_t(1)) == 'B', "_");
+		static_assert((BI_CHAR + BiChar_t(1)) == BI_CHAR_NEXT, "_");
 		static_assert((BI_CHAR | 'A') == 'A', "_");
 		static_assert((BI_CHAR & 'A') == 'A', "_");
 		static_assert((BI_CHAR ^ 'A') == BiChar_t(0), "_");

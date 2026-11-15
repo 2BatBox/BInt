@@ -43,9 +43,6 @@ struct BigInt {
 	template <size_t W>
 	friend struct BigInt;
 
-	friend struct Format;
-	friend struct Parser;
-
 	static constexpr size_t NUMBER_WIDTH_BITS = WIDTH_BITS;
 	static constexpr size_t NUMBER_WIDTH_BYTES = NUMBER_WIDTH_BITS / CHAR_BIT;
 
@@ -98,6 +95,10 @@ struct BigInt {
 	template <size_t W>
 	BIG_INT_CONSTEXPR explicit BigInt(const BigInt<W>& rv) : number{0}{
 		load_big_int(rv);
+	}
+
+	BIG_INT_CONSTEXPR explicit BigInt(const char* str) : number{0}{
+		load_str(str);
 	}
 
 	// ----------------------------------------------------------------------------
@@ -342,6 +343,23 @@ struct BigInt {
 	}
 
 	// Load string.
+	BIG_INT_CONSTEXPR size_t load_str(const char* str) {
+		size_t result = 0;
+		if(*str == '0'){
+			++str;
+			if((*str == 'x') || (*str == 'X')) {
+				++str;
+				result = load_hex_str(str);
+			} else {
+				--str;
+				result = load_dec_str(str);
+			}
+		} else {
+			result = load_dec_str(str);
+		}
+		return result;
+	}
+
 	BIG_INT_CONSTEXPR size_t load_hex_str(const char* str) {
 		const char* const str_begin = str;
 		clear();
@@ -544,8 +562,8 @@ protected:
 	}
 
 	// Load string.
-	size_t load_dec_str_unsigned(const char* str) {
-		static BIG_INT_CONSTEXPR const BigInt LIMIT_MULT_10 = BigInt(-1).div_unsigned(BigInt(10));
+	BIG_INT_CONSTEXPR size_t load_dec_str_unsigned(const char* str) {
+		BIG_INT_CONSTEXPR const BigInt LIMIT_MULT_10(BigInt(-1).div_unsigned(BigInt(10)));
 		const char* const str_begin = str;
 		clear();
 		auto ch_idx = parse_dec_char(*str);
@@ -798,7 +816,7 @@ protected:
 	// ----------------------------------------------------------------------------
 	// Helpers.
 	// ----------------------------------------------------------------------------
-	void clear() {
+	BIG_INT_CONSTEXPR void clear() {
 		size_t idx = 0;
 		while(idx < NUMBER_WIDTH_CHUNKS) {
 			number[idx++] = 0;
@@ -915,7 +933,7 @@ protected:
 		chunk_add_offset(1u, 0);
 	}
 
-	static size_t parse_hex_char(const char ch) {
+	BIG_INT_CONSTEXPR static size_t parse_hex_char(const char ch) {
 		size_t result = SIZE_MAX;
 		if((ch >= '0') && (ch <= '9')) {
 			result = ch - '0';
