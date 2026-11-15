@@ -4,7 +4,9 @@
 #include <cstdint>
 #include <type_traits>
 #include <climits>
+#include <string>
 
+#include <algorithm>
 #undef BIG_INT_CONSTEXPR
 #if __cplusplus >= 201402L
 #define BIG_INT_CONSTEXPR constexpr
@@ -36,8 +38,13 @@ struct BigInt {
 	static_assert(WIDTH_BITS > 0, "BigInt: WIDTH_BITS must be greater than zero!");
 	static_assert((WIDTH_BITS % CHAR_BIT) == 0, "BigInt: WIDTH_BITS must be a multiple of CHAR_BIT!");
 
+	static BIG_INT_CONSTEXPR const char* HEX_DIGITS = "0123456789abcdef";
+
 	template <size_t W>
 	friend struct BigInt;
+
+	friend struct Format;
+	friend struct Parser;
 
 	static constexpr size_t NUMBER_WIDTH_BITS = WIDTH_BITS;
 	static constexpr size_t NUMBER_WIDTH_BYTES = NUMBER_WIDTH_BITS / CHAR_BIT;
@@ -99,10 +106,7 @@ struct BigInt {
 	// From not wider integer.
 	template <typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= NUMBER_WIDTH_BYTES), int>::type = 0>
 	BIG_INT_CONSTEXPR BigInt& operator=(const T& init) {
-		size_t idx = 0;
-		while(idx < NUMBER_WIDTH_CHUNKS) {
-			number[idx++] = 0;
-		}
+		clear();
 		load_integer(init);
 		return *this;
 	}
@@ -314,9 +318,7 @@ struct BigInt {
 
 	// Division.
 	BIG_INT_CONSTEXPR BigInt& operator/=(const BigInt& rv) {
-		BigInt div_result;
-		div(rv, div_result);
-		*this = div_result;
+		*this = div(rv);
 		return *this;
 	}
 
@@ -326,8 +328,7 @@ struct BigInt {
 	}
 
 	BIG_INT_CONSTEXPR BigInt& operator%=(const BigInt& rv) {
-		BigInt div_result;
-		div(rv, div_result);
+		div(rv);
 		return *this;
 	}
 
@@ -340,7 +341,79 @@ struct BigInt {
 		return number[NUMBER_WIDTH_CHUNKS - 1u] & MSBIT_MASK;
 	}
 
+	// Load string.
+	BIG_INT_CONSTEXPR size_t load_hex_str(const char* str) {
+		const char* const str_begin = str;
+		clear();
+		auto ch_idx = parse_hex_char(*str);
+		while(ch_idx != SIZE_MAX) {
+			typename BigInt::UChunk chunk_out = (number[BigInt::NUMBER_WIDTH_CHUNKS - 1u]) >> (BigInt::CHUNK_WIDTH_BITS - 4u);
+			if(chunk_out) {  // overflown
+				str = str_begin;
+				break;
+			}
+			typename BigInt::UChunk chunk_in = (ch_idx & 0xF);
+			operator<<=(4u);
+			number[0] |= chunk_in;
+			++str;
+			ch_idx = parse_hex_char(*str);
+		}
+		return str - str_begin;
+	}
+
+	BIG_INT_CONSTEXPR size_t load_dec_str(const char* str) {
+		const char* const str_begin = str;
+
+		bool is_neg = false;
+		if((*str == '+') || (*str == '-')) {
+			is_neg = (*str == '-');
+			++str;
+		}
+		const size_t digits = load_dec_str_unsigned(str);
+		str += digits;
+
+		const bool pass = (digits) && ((!msbit()) || (is_neg && (operator==(BigInt::min()))));
+		if(pass && is_neg) {
+			sign_flip();
+		}
+		return pass ? (str - str_begin) : 0;
+	}
+
+	// Store string.
+	std::string store_hex_str() const {
+		BigInt val(*this);
+		std::string result;
+		do {
+			result.push_back(HEX_DIGITS[(val.number[0] & 0xF)]);
+			val.shr(4u);
+		} while(val.valuable_chunks());
+		std::reverse(result.begin(), result.end());
+		return result;
+	}
+
+	std::string store_dec_str() const {
+		static BIG_INT_CONSTEXPR const BigInt denom(10);
+		BigInt val(*this);
+		const bool msbit = val.msbit();
+		if(msbit) {
+			val.sign_flip();
+		}
+
+		std::string result;
+		do {
+			const BigInt div_result = val.div_unsigned(denom);
+			result.push_back(HEX_DIGITS[(val.number[0] & 0xF)]);
+			val = div_result;
+		} while(val.valuable_chunks());
+		if(msbit) {
+			result.push_back('-');
+		}
+		std::reverse(result.begin(), result.end());
+		return result;
+	}
+
 protected:
+
 
 	// Load integers.
 	template <typename T>
@@ -469,7 +542,29 @@ protected:
 			number[idx++] = 0;
 		}
 	}
-	
+
+	// Load string.
+	size_t load_dec_str_unsigned(const char* str) {
+		static BIG_INT_CONSTEXPR const BigInt LIMIT_MULT_10 = BigInt(-1).div_unsigned(BigInt(10));
+		const char* const str_begin = str;
+		clear();
+		auto ch_idx = parse_dec_char(*str);
+		while(ch_idx != SIZE_MAX) {
+			if(cmp_unsigned_greater(LIMIT_MULT_10)) {  // overflown
+				str = str_begin;
+				break;
+			}
+			chunk_mult(10u);
+			if(chunk_add_offset(ch_idx, 0)) {  // overflown
+				str = str_begin;
+				break;
+			}
+			++str;
+			ch_idx = parse_dec_char(*str);
+		}
+		return str - str_begin;
+	}
+
 	// Bitwise operators.
 	BIG_INT_CONSTEXPR void bitwise_not() {
 		for(size_t idx = 0; idx < NUMBER_WIDTH_CHUNKS; ++idx) {
@@ -616,7 +711,131 @@ protected:
 		*this = acc;
 	}
 
-	BIG_INT_CONSTEXPR void mult_chunk(const UChunk& chunk) {
+	BIG_INT_CONSTEXPR BigInt div(const BigInt& rv) {
+		BigInt result_div;
+		const bool mod_msbit = msbit();
+		const bool div_msbit = msbit() ^ rv.msbit();
+		if(msbit()) {
+			sign_flip();
+		}
+		BigInt denom(rv);
+		if(denom.msbit()) {
+			denom.sign_flip();
+		}
+		result_div = div_unsigned(denom);
+		if(mod_msbit){
+			sign_flip();
+		}
+		if(div_msbit){
+			result_div.sign_flip();
+		}
+		return result_div;
+	}
+
+	BIG_INT_CONSTEXPR BigInt div_unsigned(BigInt denom) {
+		BigInt result;
+		const size_t num_idx_hlf_start = most_valuable_half_chunk_idx();
+		const size_t denom_idx_hlf_start = denom.most_valuable_half_chunk_idx();
+		bool carry = false;
+
+		if((denom_idx_hlf_start == 0) && (denom.number[0] == 0)) {
+			// Generating SIGFPE. Division by zero on purpose.
+			number[0] /= denom.number[0];
+		}
+
+		if(num_idx_hlf_start >= denom_idx_hlf_start) {
+			size_t shift_hd = num_idx_hlf_start - denom_idx_hlf_start;
+			size_t idx_hlf = num_idx_hlf_start;
+			denom.shift_left(shift_hd * HALF_CHUNK_WIDTH_BITS);
+
+			while(shift_hd < HALF_WIDTH_CHUNKS) {
+				if(carry) {
+					const size_t idx_hlf_next = idx_hlf + 1u;
+
+					while(half_chunk(idx_hlf_next)) {
+						const UChunk div_floor = full_chunk(idx_hlf_next) / (denom.half_chunk(idx_hlf) + 1u);
+						BigInt mult_result = denom;
+						mult_result.chunk_mult(div_floor);
+						result.chunk_add_offset(div_floor, 0);
+						operator-=(mult_result);
+					}
+					carry = false;
+				}
+
+				if(half_chunk(idx_hlf)){
+					const UChunk num_full_chunk = full_chunk(idx_hlf);
+					const UChunk denom_full_chunk = denom.full_chunk(idx_hlf);
+
+					if(num_full_chunk > denom_full_chunk) {
+						const UChunk div_floor = num_full_chunk / (denom_full_chunk + 1u);
+						BigInt mult_result = denom;
+						mult_result.chunk_mult(div_floor);
+						result.chunk_add_offset(div_floor, 0);
+						operator-=(mult_result);
+					}
+
+					while(!cmp_unsigned_less(denom)) {
+						operator-=(denom);
+						result.chunk_add_offset(1u, 0);
+					}
+
+					carry = half_chunk(idx_hlf);
+				}
+
+				if(shift_hd) {
+					result.shift_left(HALF_CHUNK_WIDTH_BITS);
+					denom.shift_right_unsigned(HALF_CHUNK_WIDTH_BITS);
+				}
+				--shift_hd;
+				--idx_hlf;
+			}
+
+		}
+		return result;
+	}
+
+
+	// ----------------------------------------------------------------------------
+	// Helpers.
+	// ----------------------------------------------------------------------------
+	void clear() {
+		size_t idx = 0;
+		while(idx < NUMBER_WIDTH_CHUNKS) {
+			number[idx++] = 0;
+		}
+	}
+
+	BIG_INT_CONSTEXPR UChunk half_chunk(const size_t idx_hlf) const {
+		UChunk result = number[idx_hlf / 2u];
+		return ((idx_hlf % 2u) == 0) ? (result & HALF_CHUNK_LOW_MASK) : (result >> HALF_CHUNK_WIDTH_BITS);
+	}
+
+	BIG_INT_CONSTEXPR UChunk full_chunk(const size_t idx_hlf) const {
+		const size_t idx = idx_hlf / 2u;
+		UChunk result = number[idx];
+		if((idx_hlf % 2u) == 0) {
+			result <<= HALF_CHUNK_WIDTH_BITS;
+			if(idx) {
+				result |= (number[idx-1u] >> HALF_CHUNK_WIDTH_BITS);
+			}
+		}
+		return result;
+	}
+
+	BIG_INT_CONSTEXPR UChunk chunk_add_offset(const UChunk& ch, size_t idx) {
+		number[idx] += ch;
+		UChunk carry = (number[idx] < ch);
+		++idx;
+
+		while(carry && (idx < NUMBER_WIDTH_CHUNKS)) {
+			number[idx] += carry;
+			carry = (number[idx] < carry);
+			++idx;
+		}
+		return carry;
+	}
+
+	BIG_INT_CONSTEXPR void chunk_mult(const UChunk& chunk) {
 		BigInt acc;
 		const size_t val_ch = valuable_chunks();
 		for(size_t idx = 0; idx < val_ch; ++idx) {
@@ -642,122 +861,6 @@ protected:
 			}
 		}
 		*this = acc;
-	}
-
-	BIG_INT_CONSTEXPR void div(const BigInt& rv, BigInt& result_div) {
-		const bool mod_msbit = msbit();
-		const bool div_msbit = msbit() ^ rv.msbit();
-		if(msbit()) {
-			sign_flip();
-		}
-		BigInt denom(rv);
-		if(denom.msbit()) {
-			denom.sign_flip();
-		}
-		div_unsigned(denom, result_div);
-		if(mod_msbit){
-			sign_flip();
-		}
-		if(div_msbit){
-			result_div.sign_flip();
-		}
-	}
-
-	BIG_INT_CONSTEXPR void div_unsigned(BigInt denom, BigInt& result) {
-		const size_t num_idx_hlf_start = most_valuable_half_chunk_idx();
-		const size_t denom_idx_hlf_start = denom.most_valuable_half_chunk_idx();
-		bool carry = false;
-
-		if((denom_idx_hlf_start == 0) && (denom.number[0] == 0)) {
-			// Generating SIGFPE. Division by zero on purpose.
-			number[0] /= denom.number[0];
-		}
-
-		if(num_idx_hlf_start >= denom_idx_hlf_start) {
-			size_t shift_hd = num_idx_hlf_start - denom_idx_hlf_start;
-			size_t idx_hlf = num_idx_hlf_start;
-			denom.shift_left(shift_hd * HALF_CHUNK_WIDTH_BITS);
-
-			while(shift_hd < HALF_WIDTH_CHUNKS) {
-				if(carry) {
-					const size_t idx_hlf_next = idx_hlf + 1u;
-
-					while(half_chunk(idx_hlf_next)) {
-						const UChunk div_floor = full_chunk(idx_hlf_next) / (denom.half_chunk(idx_hlf) + 1u);
-						BigInt mult_result = denom;
-						mult_result.mult_chunk(div_floor);
-						result.chunk_add_offset(div_floor, 0);
-						operator-=(mult_result);
-					}
-					carry = false;
-				}
-
-				if(half_chunk(idx_hlf)){
-					const UChunk num_full_chunk = full_chunk(idx_hlf);
-					const UChunk denom_full_chunk = denom.full_chunk(idx_hlf);
-
-					if(num_full_chunk > denom_full_chunk) {
-						const UChunk div_floor = num_full_chunk / (denom_full_chunk + 1u);
-						BigInt mult_result = denom;
-						mult_result.mult_chunk(div_floor);
-						result.chunk_add_offset(div_floor, 0);
-						operator-=(mult_result);
-					}
-
-					while(!cmp_unsigned_less(denom)) {
-						operator-=(denom);
-						result.chunk_add_offset(1u, 0);
-					}
-
-					carry = half_chunk(idx_hlf);
-				}
-
-				if(shift_hd) {
-					result.shift_left(HALF_CHUNK_WIDTH_BITS);
-					denom.shift_right_unsigned(HALF_CHUNK_WIDTH_BITS);
-				}
-				--shift_hd;
-				--idx_hlf;
-			}
-
-		}
-	}
-
-
-	// ----------------------------------------------------------------------------
-	// Helpers.
-	// ----------------------------------------------------------------------------
-
-	// Half chunk getters.
-	BIG_INT_CONSTEXPR UChunk half_chunk(const size_t idx_hlf) const {
-		UChunk result = number[idx_hlf / 2u];
-		return ((idx_hlf % 2u) == 0) ? (result & HALF_CHUNK_LOW_MASK) : (result >> HALF_CHUNK_WIDTH_BITS);
-	}
-
-	BIG_INT_CONSTEXPR UChunk full_chunk(const size_t idx_hlf) const {
-		const size_t idx = idx_hlf / 2u;
-		UChunk result = number[idx];
-		if((idx_hlf % 2u) == 0) {
-			result <<= HALF_CHUNK_WIDTH_BITS;
-			if(idx) {
-				result |= (number[idx-1u] >> HALF_CHUNK_WIDTH_BITS);
-			}
-		}
-		return result;
-	}
-
-
-	BIG_INT_CONSTEXPR UChunk chunk_add_offset(const UChunk& ch, size_t idx) {
-		number[idx] += ch;
-		UChunk carry = (number[idx] < ch);
-		++idx;
-
-		while(carry && (idx < NUMBER_WIDTH_CHUNKS)) {
-			number[idx] += carry;
-			carry = (number[idx] < carry);
-			++idx;
-		}
-		return carry;
 	}
 
 	BIG_INT_CONSTEXPR size_t valuable_chunks() const {
@@ -810,6 +913,26 @@ protected:
 	BIG_INT_CONSTEXPR void sign_flip() {
 		bitwise_not();
 		chunk_add_offset(1u, 0);
+	}
+
+	static size_t parse_hex_char(const char ch) {
+		size_t result = SIZE_MAX;
+		if((ch >= '0') && (ch <= '9')) {
+			result = ch - '0';
+		} else if((ch >= 'a') && (ch <= 'f')) {
+			result = ch - 'a' + 10u;
+		} else if((ch >= 'A') && (ch <= 'F')) {
+			result = ch - 'A' + 10u;
+		}
+		return result;
+	}
+
+	static size_t parse_dec_char(const char ch) {
+		size_t result = SIZE_MAX;
+		if((ch >= '0') && (ch <= '9')) {
+			result = ch - '0';
+		}
+		return result;
 	}
 
 };

@@ -5,7 +5,7 @@
 int main(int argc, char** argv) {
 	using BigType_t = BigInt<CHAR_BIT * sizeof(int)>;
 
-	int x = 0;
+	int x = 1;
 	int y = 0;
 	int result;
 

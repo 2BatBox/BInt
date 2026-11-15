@@ -64,39 +64,39 @@ class TestBigInt {
 
 #define ITERATE_BIGINT_AND_NOT_WIDER_INTEGER(func, rounds) { \
 	printf("->TestBigInt::"#func"()\n");                        \
-    func<BigInt<(1u * CHAR_BIT)>, NotWiderInteger<1u>>(rounds); \
-	func<BigInt<(2u * CHAR_BIT)>, NotWiderInteger<2u>>(rounds); \
-	func<BigInt<(3u * CHAR_BIT)>, NotWiderInteger<3u>>(rounds); \
-	func<BigInt<(4u * CHAR_BIT)>, NotWiderInteger<4u>>(rounds); \
-	func<BigInt<(5u * CHAR_BIT)>, NotWiderInteger<5u>>(rounds); \
-	func<BigInt<(6u * CHAR_BIT)>, NotWiderInteger<6u>>(rounds); \
-	func<BigInt<(7u * CHAR_BIT)>, NotWiderInteger<7u>>(rounds); \
-	func<BigInt<(8u * CHAR_BIT)>, NotWiderInteger<8u>>(rounds); \
-	func<BigInt<(9u * CHAR_BIT)>, NotWiderInteger<9u>>(rounds); \
-	func<BigInt<(10u * CHAR_BIT)>, NotWiderInteger<10u>>(rounds); \
-	func<BigInt<(11u * CHAR_BIT)>, NotWiderInteger<11u>>(rounds); \
-	func<BigInt<(12u * CHAR_BIT)>, NotWiderInteger<12u>>(rounds); \
-	func<BigInt<(13u * CHAR_BIT)>, NotWiderInteger<13u>>(rounds); \
-	func<BigInt<(14u * CHAR_BIT)>, NotWiderInteger<14u>>(rounds); \
-	func<BigInt<(15u * CHAR_BIT)>, NotWiderInteger<15u>>(rounds); \
-	func<BigInt<(16u * CHAR_BIT)>, NotWiderInteger<16u>>(rounds); \
-	func<BigInt<(17u * CHAR_BIT)>, NotWiderInteger<17u>>(rounds); \
+    func<BigInt<(1u * CHAR_BIT)>, NotWiderInteger<1u> >(rounds); \
+	func<BigInt<(2u * CHAR_BIT)>, NotWiderInteger<2u> >(rounds); \
+	func<BigInt<(3u * CHAR_BIT)>, NotWiderInteger<3u> >(rounds); \
+	func<BigInt<(4u * CHAR_BIT)>, NotWiderInteger<4u> >(rounds); \
+	func<BigInt<(5u * CHAR_BIT)>, NotWiderInteger<5u> >(rounds); \
+	func<BigInt<(6u * CHAR_BIT)>, NotWiderInteger<6u> >(rounds); \
+	func<BigInt<(7u * CHAR_BIT)>, NotWiderInteger<7u> >(rounds); \
+	func<BigInt<(8u * CHAR_BIT)>, NotWiderInteger<8u> >(rounds); \
+	func<BigInt<(9u * CHAR_BIT)>, NotWiderInteger<9u> >(rounds); \
+	func<BigInt<(10u * CHAR_BIT)>, NotWiderInteger<10u> >(rounds); \
+	func<BigInt<(11u * CHAR_BIT)>, NotWiderInteger<11u> >(rounds); \
+	func<BigInt<(12u * CHAR_BIT)>, NotWiderInteger<12u> >(rounds); \
+	func<BigInt<(13u * CHAR_BIT)>, NotWiderInteger<13u> >(rounds); \
+	func<BigInt<(14u * CHAR_BIT)>, NotWiderInteger<14u> >(rounds); \
+	func<BigInt<(15u * CHAR_BIT)>, NotWiderInteger<15u> >(rounds); \
+	func<BigInt<(16u * CHAR_BIT)>, NotWiderInteger<16u> >(rounds); \
+	func<BigInt<(17u * CHAR_BIT)>, NotWiderInteger<17u> >(rounds); \
 }
 
 
 #define ITERATE_BIGINT_AND_WIDER_BIGINT(func, rounds) { \
 printf("->TestBigInt::"#func"()\n"); \
-	func<BigInt<CHAR_BIT>, BigInt<CHAR_BIT * 2u>>(rounds); \
-	func<BigInt<CHAR_BIT>, BigInt<CHAR_BIT * 3u>>(rounds); \
-	func<BigInt<CHAR_BIT>, BigInt<CHAR_BIT * 4u>>(rounds); \
-	func<BigInt<CHAR_BIT * 2u>, BigInt<CHAR_BIT * 3u>>(rounds); \
-	func<BigInt<CHAR_BIT * 2u>, BigInt<CHAR_BIT * 4u>>(rounds); \
-	func<BigInt<CHAR_BIT * 2u>, BigInt<CHAR_BIT * 5u>>(rounds); \
-	func<BigInt<CHAR_BIT * 2u>, BigInt<CHAR_BIT * 8u>>(rounds); \
-	func<BigInt<CHAR_BIT * 7u>, BigInt<CHAR_BIT * 8u>>(rounds); \
-	func<BigInt<CHAR_BIT * 7u>, BigInt<CHAR_BIT * 10u>>(rounds); \
-	func<BigInt<CHAR_BIT * 7u>, BigInt<CHAR_BIT * 13u>>(rounds); \
-	func<BigInt<CHAR_BIT * 7u>, BigInt<CHAR_BIT * 64u>>(rounds); \
+	func<BigInt<CHAR_BIT>, BigInt<CHAR_BIT * 2u> >(rounds); \
+	func<BigInt<CHAR_BIT>, BigInt<CHAR_BIT * 3u> >(rounds); \
+	func<BigInt<CHAR_BIT>, BigInt<CHAR_BIT * 4u> >(rounds); \
+	func<BigInt<CHAR_BIT * 2u>, BigInt<CHAR_BIT * 3u> >(rounds); \
+	func<BigInt<CHAR_BIT * 2u>, BigInt<CHAR_BIT * 4u> >(rounds); \
+	func<BigInt<CHAR_BIT * 2u>, BigInt<CHAR_BIT * 5u> >(rounds); \
+	func<BigInt<CHAR_BIT * 2u>, BigInt<CHAR_BIT * 8u> >(rounds); \
+	func<BigInt<CHAR_BIT * 7u>, BigInt<CHAR_BIT * 8u> >(rounds); \
+	func<BigInt<CHAR_BIT * 7u>, BigInt<CHAR_BIT * 10u> >(rounds); \
+	func<BigInt<CHAR_BIT * 7u>, BigInt<CHAR_BIT * 13u> >(rounds); \
+	func<BigInt<CHAR_BIT * 7u>, BigInt<CHAR_BIT * 64u> >(rounds); \
 }
 public:
 
@@ -107,6 +107,9 @@ public:
 		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGER(test_load_store_int, AUTOTEST_ROUNDS);
 		ITERATE_BIGINT_AND_NOT_WIDER_INTEGER(test_load_store_int, AUTOTEST_ROUNDS);
 		ITERATE_BIGINT_AND_WIDER_BIGINT(test_load_store_big_int, AUTOTEST_ROUNDS);
+		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGER(test_load_store_string, AUTOTEST_ROUNDS);
+		ITERATE_BIGINT_AND_NOT_WIDER_INTEGER(test_load_store_string, AUTOTEST_ROUNDS);
+
 		test_type_conversion_int_to_bigint();
 
 		// Test BigInt arithmetic operations comparing the results with the equal sized integral integer types.
@@ -137,21 +140,21 @@ public:
 		test_performance<signed long long>(PERFORMANCE_TEST_ROUNDS);
 
 		test_performance_header("BigInt<>");
-		test_performance<BigInt<CHAR_BIT * 1u>>(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 2u>>(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 3u>>(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 4u>>(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 5u>>(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 6u>>(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 7u>>(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 8u>>(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 10u>>(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 15u>>(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 16u>>(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 24u>>(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 36u>>(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 48u>>(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 256u>>(PERFORMANCE_TEST_ROUNDS);
+		test_performance<BigInt<CHAR_BIT * 1u> >(PERFORMANCE_TEST_ROUNDS);
+		test_performance<BigInt<CHAR_BIT * 2u> >(PERFORMANCE_TEST_ROUNDS);
+		test_performance<BigInt<CHAR_BIT * 3u> >(PERFORMANCE_TEST_ROUNDS);
+		test_performance<BigInt<CHAR_BIT * 4u> >(PERFORMANCE_TEST_ROUNDS);
+		test_performance<BigInt<CHAR_BIT * 5u> >(PERFORMANCE_TEST_ROUNDS);
+		test_performance<BigInt<CHAR_BIT * 6u> >(PERFORMANCE_TEST_ROUNDS);
+		test_performance<BigInt<CHAR_BIT * 7u> >(PERFORMANCE_TEST_ROUNDS);
+		test_performance<BigInt<CHAR_BIT * 8u> >(PERFORMANCE_TEST_ROUNDS);
+		test_performance<BigInt<CHAR_BIT * 10u> >(PERFORMANCE_TEST_ROUNDS);
+		test_performance<BigInt<CHAR_BIT * 15u> >(PERFORMANCE_TEST_ROUNDS);
+		test_performance<BigInt<CHAR_BIT * 16u> >(PERFORMANCE_TEST_ROUNDS);
+		test_performance<BigInt<CHAR_BIT * 24u> >(PERFORMANCE_TEST_ROUNDS);
+		test_performance<BigInt<CHAR_BIT * 36u> >(PERFORMANCE_TEST_ROUNDS);
+		test_performance<BigInt<CHAR_BIT * 48u> >(PERFORMANCE_TEST_ROUNDS);
+		test_performance<BigInt<CHAR_BIT * 256u> >(PERFORMANCE_TEST_ROUNDS);
 	}
 
 	template <typename BigType_t, typename Integer>
@@ -206,6 +209,53 @@ public:
 		a_out = A(b_in);
 		ASSERT(a_in == a_out);
 		ASSERT(a_out == a_in);
+	}
+
+	template <typename BigType_t, typename Integer>
+	void test_load_store_string(size_t rounds) {
+		static_assert(sizeof(BigType_t) >= sizeof(Integer), "Size assert");
+		RndIntGen<Integer> gen;
+		BigType_t bint;
+
+		ASSERT(bint.load_dec_str("") == 0);
+		ASSERT(bint.load_dec_str("+") == 0);
+		ASSERT(bint.load_dec_str("-") == 0);
+		ASSERT(bint.load_dec_str(".0") == 0);
+		ASSERT(bint.load_dec_str("++0") == 0);
+		ASSERT(bint.load_dec_str("--0") == 0);
+
+		ASSERT(bint.load_hex_str("+0") == 0);
+		ASSERT(bint.load_hex_str("-0") == 0);
+		ASSERT(bint.load_hex_str("x") == 0);
+		ASSERT(bint.load_hex_str("za") == 0);
+
+		test_load_store_string_value<BigType_t, Integer>(bint, -1);
+		test_load_store_string_value<BigType_t, Integer>(bint, 0);
+		test_load_store_string_value<BigType_t, Integer>(bint, 1);
+		test_load_store_string_value<BigType_t, Integer>(bint, std::numeric_limits<Integer>::min());
+		test_load_store_string_value<BigType_t, Integer>(bint, std::numeric_limits<Integer>::max());
+
+		while(rounds--) {
+			test_load_store_string_value(bint, gen.next());
+		}
+	}
+
+	template <typename BigType_t, typename Integer>
+	void test_load_store_string_value(BigType_t& bint, const Integer& int_ref) {
+		// dec
+		const std::string str_dec_in = std::to_string(int_ref);
+		ASSERT(bint.load_dec_str(str_dec_in.c_str()));
+		const std::string str_dec_out = bint.store_dec_str();
+		ASSERT(str_dec_in == str_dec_out);
+
+		// hex
+		const std::string str_hex_out = bint.store_hex_str();
+		BigType_t hex_in;
+		ASSERT(hex_in.load_hex_str(str_hex_out.c_str()));
+		const std::string str_hex_in = hex_in.store_hex_str();
+		ASSERT(str_hex_in == str_hex_out);
+
+		ASSERT(hex_in == bint);
 	}
 
 	// ----------------------------------------------------------------------------
