@@ -345,15 +345,8 @@ struct BigInt {
 	// Load string.
 	BIG_INT_CONSTEXPR size_t load_str(const char* str) {
 		size_t result = 0;
-		if(*str == '0'){
-			++str;
-			if((*str == 'x') || (*str == 'X')) {
-				++str;
-				result = load_hex_str(str);
-			} else {
-				--str;
-				result = load_dec_str(str);
-			}
+		if((*str == '0') && ((str[1u] == 'x') || (str[1u] == 'X'))){
+			result = load_hex_str(str + 2u);
 		} else {
 			result = load_dec_str(str);
 		}

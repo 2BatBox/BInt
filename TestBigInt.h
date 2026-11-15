@@ -259,7 +259,10 @@ public:
 		ASSERT(hex_in.load_str(str_dec_in.c_str()));
 		ASSERT(hex_in == bint);
 
-		ASSERT(hex_in.load_str(str_hex_out.c_str()));
+		std::string hex_with_prefix("0x");
+		hex_with_prefix.append(str_hex_out);
+
+		ASSERT(hex_in.load_str(hex_with_prefix.c_str()));
 		ASSERT(hex_in == bint);
 	}
 
