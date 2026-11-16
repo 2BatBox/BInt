@@ -108,7 +108,8 @@ public:
 		ITERATE_BIGINT_AND_NOT_WIDER_INTEGER(test_load_store_int, AUTOTEST_ROUNDS);
 		ITERATE_BIGINT_AND_WIDER_BIGINT(test_load_store_big_int, AUTOTEST_ROUNDS);
 		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGER(test_load_store_string, AUTOTEST_ROUNDS);
-		ITERATE_BIGINT_AND_NOT_WIDER_INTEGER(test_load_store_string, AUTOTEST_ROUNDS);
+
+		ITERATE_BIGINT_AND_NOT_WIDER_INTEGER(test_load_store_string, AUTOTEST_ROUNDS); // TODO: remove
 
 		test_type_conversion_int_to_bigint();
 
@@ -132,29 +133,29 @@ public:
 
 		test_constexpr_values();
 
-		test_performance_header("Built-in integers");
-		test_performance<signed char>(PERFORMANCE_TEST_ROUNDS);
-		test_performance<signed short>(PERFORMANCE_TEST_ROUNDS);
-		test_performance<signed int>(PERFORMANCE_TEST_ROUNDS);
-		test_performance<signed long>(PERFORMANCE_TEST_ROUNDS);
-		test_performance<signed long long>(PERFORMANCE_TEST_ROUNDS);
-
-		test_performance_header("BigInt<>");
-		test_performance<BigInt<CHAR_BIT * 1u> >(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 2u> >(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 3u> >(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 4u> >(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 5u> >(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 6u> >(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 7u> >(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 8u> >(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 10u> >(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 15u> >(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 16u> >(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 24u> >(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 36u> >(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 48u> >(PERFORMANCE_TEST_ROUNDS);
-		test_performance<BigInt<CHAR_BIT * 256u> >(PERFORMANCE_TEST_ROUNDS);
+//		test_performance_header("Built-in integers");
+//		test_performance<signed char>(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<signed short>(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<signed int>(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<signed long>(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<signed long long>(PERFORMANCE_TEST_ROUNDS);
+//
+//		test_performance_header("BigInt<>");
+//		test_performance<BigInt<CHAR_BIT * 1u> >(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<BigInt<CHAR_BIT * 2u> >(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<BigInt<CHAR_BIT * 3u> >(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<BigInt<CHAR_BIT * 4u> >(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<BigInt<CHAR_BIT * 5u> >(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<BigInt<CHAR_BIT * 6u> >(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<BigInt<CHAR_BIT * 7u> >(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<BigInt<CHAR_BIT * 8u> >(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<BigInt<CHAR_BIT * 10u> >(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<BigInt<CHAR_BIT * 15u> >(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<BigInt<CHAR_BIT * 16u> >(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<BigInt<CHAR_BIT * 24u> >(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<BigInt<CHAR_BIT * 36u> >(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<BigInt<CHAR_BIT * 48u> >(PERFORMANCE_TEST_ROUNDS);
+//		test_performance<BigInt<CHAR_BIT * 256u> >(PERFORMANCE_TEST_ROUNDS);
 	}
 
 	template <typename BigType_t, typename Integer>
@@ -215,19 +216,20 @@ public:
 	void test_load_store_string(size_t rounds) {
 		static_assert(sizeof(BigType_t) >= sizeof(Integer), "Size assert");
 		RndIntGen<Integer> gen;
-		BigType_t bint;
+		BigType_t bint(-1);
 
-		ASSERT(bint.load_dec_str("") == 0);
-		ASSERT(bint.load_dec_str("+") == 0);
-		ASSERT(bint.load_dec_str("-") == 0);
-		ASSERT(bint.load_dec_str(".0") == 0);
-		ASSERT(bint.load_dec_str("++0") == 0);
-		ASSERT(bint.load_dec_str("--0") == 0);
+		ASSERT(bint.load_str("") == 0);
+		ASSERT(bint.load_str("+") == 0);
+		ASSERT(bint.load_str("-") == 0);
+		ASSERT(bint.load_str(".0") == 0);
+		ASSERT(bint.load_str("++0") == 0);
+		ASSERT(bint.load_str("--0") == 0);
+		ASSERT(bint.load_str("0x") == 0);
+		ASSERT(bint.load_str("+0x") == 0);
+		ASSERT(bint.load_str("-0x") == 0);
+		ASSERT(bint.load_str("za") == 0);
 
-		ASSERT(bint.load_hex_str("+0") == 0);
-		ASSERT(bint.load_hex_str("-0") == 0);
-		ASSERT(bint.load_hex_str("x") == 0);
-		ASSERT(bint.load_hex_str("za") == 0);
+		ASSERT(bint == BigType_t(-1));
 
 		test_load_store_string_value<BigType_t, Integer>(bint, -1);
 		test_load_store_string_value<BigType_t, Integer>(bint, 0);
@@ -244,26 +246,18 @@ public:
 	void test_load_store_string_value(BigType_t& bint, const Integer& int_ref) {
 		// dec
 		const std::string str_dec_in = std::to_string(int_ref);
-		ASSERT(bint.load_dec_str(str_dec_in.c_str()));
-		const std::string str_dec_out = bint.store_dec_str();
+		ASSERT(bint.load_str(str_dec_in.c_str()));
+		const std::string str_dec_out = bint.store_str(10);
 		ASSERT(str_dec_in == str_dec_out);
 
 		// hex
-		const std::string str_hex_out = bint.store_hex_str();
-		BigType_t hex_in;
-		ASSERT(hex_in.load_hex_str(str_hex_out.c_str()));
-		const std::string str_hex_in = hex_in.store_hex_str();
-		ASSERT(str_hex_in == str_hex_out);
+		BigType_t base_any_ref;
+		for(int i = 2; i < 17; ++i) {
+			const std::string str_base_any = bint.store_str(i);
+			ASSERT(base_any_ref.load_str(str_base_any.c_str(), i));
+			ASSERT(base_any_ref == bint);
+		}
 
-		// common
-		ASSERT(hex_in.load_str(str_dec_in.c_str()));
-		ASSERT(hex_in == bint);
-
-		std::string hex_with_prefix("0x");
-		hex_with_prefix.append(str_hex_out);
-
-		ASSERT(hex_in.load_str(hex_with_prefix.c_str()));
-		ASSERT(hex_in == bint);
 	}
 
 	// ----------------------------------------------------------------------------

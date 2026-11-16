@@ -14,6 +14,13 @@
 #define BIG_INT_CONSTEXPR
 #endif
 
+struct BigIntDigitHolder {
+	static char get_digit(size_t idx) {
+		static BIG_INT_CONSTEXPR char HEX_DIGITS[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+		return HEX_DIGITS[idx & 0x0f];
+	}
+};
+
 /**
  * @tparam WIDTH_BITS
  *
@@ -340,84 +347,112 @@ struct BigInt {
 		return number[NUMBER_WIDTH_CHUNKS - 1u] & MSBIT_MASK;
 	}
 
-	// Load string.
-	BIG_INT_CONSTEXPR size_t load_str(const char* str) {
-		size_t result = 0;
-		if((*str == '0') && ((str[1u] == 'x') || (str[1u] == 'X'))){
-			result = load_hex_str(str + 2u);
-		} else {
-			result = load_dec_str(str);
-		}
-		return result;
-	}
-
-	BIG_INT_CONSTEXPR size_t load_hex_str(const char* str) {
+	BIG_INT_CONSTEXPR size_t load_str(const char* str, int base = 0 /* autoset by prefix*/) {
 		const char* const str_begin = str;
-		clear();
-		auto ch_idx = parse_hex_char(*str);
-		while(ch_idx != SIZE_MAX) {
-			typename BigInt::UChunk chunk_out = (number[BigInt::NUMBER_WIDTH_CHUNKS - 1u]) >> (BigInt::CHUNK_WIDTH_BITS - 4u);
-			if(chunk_out) {  // overflown
-				str = str_begin;
-				break;
-			}
-			typename BigInt::UChunk chunk_in = (ch_idx & 0xF);
-			operator<<=(4u);
-			number[0] |= chunk_in;
-			++str;
-			ch_idx = parse_hex_char(*str);
-		}
-		return str - str_begin;
-	}
-
-	BIG_INT_CONSTEXPR size_t load_dec_str(const char* str) {
-		const char* const str_begin = str;
-
 		bool is_neg = false;
 		if((*str == '+') || (*str == '-')) {
 			is_neg = (*str == '-');
 			++str;
 		}
-		const size_t digits = load_dec_str_unsigned(str);
+
+		int base_prefix = 10;
+		str += str_base(str, base_prefix);
+		if(base == 0){
+			base = base_prefix;
+		}
+
+		BigInt acc;
+		size_t digits = 0;
+		switch(base){
+			case 2: digits = load_base_2_str_unsigned<0x01, 1u>(str, acc); break;
+			case 3: digits = load_base_any_str_unsigned<3>(str, acc); break;
+			case 4: digits = load_base_2_str_unsigned<0x03, 2u>(str, acc); break;
+			case 5: digits = load_base_any_str_unsigned<5>(str, acc); break;
+			case 6: digits = load_base_any_str_unsigned<6>(str, acc); break;
+			case 7: digits = load_base_any_str_unsigned<7>(str, acc); break;
+			case 8: digits = load_base_2_str_unsigned<0x07, 3u>(str, acc); break;
+			case 9: digits = load_base_any_str_unsigned<9>(str, acc); break;
+			case 10: digits = load_base_any_str_unsigned<10>(str, acc); break;
+			case 11: digits = load_base_any_str_unsigned<11>(str, acc); break;
+			case 12: digits = load_base_any_str_unsigned<12>(str, acc); break;
+			case 13: digits = load_base_any_str_unsigned<13>(str, acc); break;
+			case 14: digits = load_base_any_str_unsigned<14>(str, acc); break;
+			case 15: digits = load_base_any_str_unsigned<15>(str, acc); break;
+			case 16: digits = load_base_2_str_unsigned<0x0F, 4u>(str, acc); break;
+			default:
+				break;
+		}
+
 		str += digits;
 
-		const bool pass = (digits) && ((!msbit()) || (is_neg && (operator==(BigInt::min()))));
-		if(pass && is_neg) {
-			sign_flip();
+		const bool pass = (digits) && ((!acc.msbit()) || (is_neg && (acc == BigInt::min())));
+		if(pass) {
+			*this = acc;
+			if(is_neg) {
+				sign_flip();
+			}
 		}
 		return pass ? (str - str_begin) : 0;
 	}
 
-	// Store string.
-	std::string store_hex_str() const {
-		static constexpr char HEX_DIGITS[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
-
-		BigInt val(*this);
+	std::string store_str(int base = 10, bool with_prefix = true) const {
 		std::string result;
-		do {
-			result.push_back(HEX_DIGITS[(val.number[0] & 0xF)]);
-			val.shr(4u);
-		} while(val.valuable_chunks());
-		std::reverse(result.begin(), result.end());
-		return result;
-	}
+		if((base < 2) || (base > 16)) {
+			return result;
+		}
 
-	std::string store_dec_str() const {
-		static constexpr char DEC_DIGITS[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '?', '?', '?', '?', '?', '?'};
-
-		static BIG_INT_CONSTEXPR BigInt denom(10);
 		BigInt val(*this);
 		const bool msbit = val.msbit();
 		if(msbit) {
 			val.sign_flip();
 		}
 
-		std::string result;
-		do {
-			const BigInt div_result = val.div_unsigned(denom);
-			result.push_back(DEC_DIGITS[(val.number[0] & 0xF)]);
-			val = div_result;
-		} while(val.valuable_chunks());
+		switch(base){
+			case 2: result = val.store_base_2_str_unsigned<0x01, 1u>(); break;
+			case 3: result = val.store_base_any_str_unsigned<3>(); break;
+			case 4: result = val.store_base_2_str_unsigned<0x03, 2u>(); break;
+			case 5: result = val.store_base_any_str_unsigned<5>(); break;
+			case 6: result = val.store_base_any_str_unsigned<6>(); break;
+			case 7: result = val.store_base_any_str_unsigned<7>(); break;
+			case 8: result = val.store_base_2_str_unsigned<0x07, 3u>(); break;
+			case 9: result = val.store_base_any_str_unsigned<9>(); break;
+			case 10: result = val.store_base_any_str_unsigned<10>(); break;
+			case 11: result = val.store_base_any_str_unsigned<11>(); break;
+			case 12: result = val.store_base_any_str_unsigned<12>(); break;
+			case 13: result = val.store_base_any_str_unsigned<13>(); break;
+			case 14: result = val.store_base_any_str_unsigned<14>(); break;
+			case 15: result = val.store_base_any_str_unsigned<15>(); break;
+			case 16: result = val.store_base_2_str_unsigned<0x0F, 4u>(); break;
+			default:
+				break;
+		}
+
+		if(with_prefix) {
+			switch(base){
+				case 2:
+					result.push_back('b');
+					result.push_back('0');
+					break;
+
+				case 4:
+					result.push_back('q');
+					result.push_back('0');
+					break;
+
+				case 8:
+					result.push_back('0');
+					break;
+
+				case 16:
+					result.push_back('x');
+					result.push_back('0');
+					break;
+
+				default:
+					break;
+			}
+		}
+
 		if(msbit) {
 			result.push_back('-');
 		}
@@ -557,25 +592,71 @@ protected:
 	}
 
 	// Load string.
-	BIG_INT_CONSTEXPR size_t load_dec_str_unsigned(const char* str) {
-		BIG_INT_CONSTEXPR BigInt LIMIT_MULT_10(BigInt(-1).div_unsigned(BigInt(10)));
+	template <UChunk MASK, unsigned BITS>
+	static BIG_INT_CONSTEXPR size_t load_base_2_str_unsigned(const char* str, BigInt& acc) {
 		const char* const str_begin = str;
-		clear();
-		auto ch_idx = parse_dec_char(*str);
-		while(ch_idx != SIZE_MAX) {
-			if(cmp_unsigned_greater(LIMIT_MULT_10)) {  // overflown
+		auto ch_idx = parse_any_base_char(*str);
+		while(ch_idx <= MASK) {
+			typename BigInt::UChunk chunk_out = (acc.number[BigInt::NUMBER_WIDTH_CHUNKS - 1u]) >> (BigInt::CHUNK_WIDTH_BITS - BITS);
+			if(chunk_out) {  // overflown
 				str = str_begin;
 				break;
 			}
-			chunk_mult(10u);
-			if(chunk_add_offset(ch_idx, 0)) {  // overflown
+			typename BigInt::UChunk chunk_in = (ch_idx & MASK);
+			acc <<= BITS;
+			acc.number[0] |= chunk_in;
+			++str;
+			ch_idx = parse_any_base_char(*str);
+		}
+		return str - str_begin;
+	}
+
+	template <int BASE, typename std::enable_if<((BASE > 2) && (BASE < 16)), int>::type = 0>
+	static BIG_INT_CONSTEXPR size_t load_base_any_str_unsigned(const char* str, BigInt& acc) {
+		BIG_INT_CONSTEXPR BigInt LIMIT_MULT_BASE(BigInt(-1).div_unsigned(BigInt(BASE)));
+		BIG_INT_CONSTEXPR unsigned BASE_UNSIGNED(BASE);
+		const char* const str_begin = str;
+		auto ch_idx = parse_any_base_char(*str);
+
+		while(ch_idx < BASE_UNSIGNED) {
+			if(acc.cmp_unsigned_greater(LIMIT_MULT_BASE)) {  // overflown
+				str = str_begin;
+				break;
+			}
+			acc.chunk_mult(BASE);
+			if(acc.chunk_add_offset(ch_idx, 0)) {  // overflown
 				str = str_begin;
 				break;
 			}
 			++str;
-			ch_idx = parse_dec_char(*str);
+			ch_idx = parse_any_base_char(*str);
 		}
 		return str - str_begin;
+	}
+
+	// Store string.
+	template <UChunk MASK, unsigned BITS>
+	std::string store_base_2_str_unsigned() const {
+		BigInt val(*this);
+		std::string result;
+		do {
+			result.push_back(BigIntDigitHolder::get_digit((val.number[0] & MASK)));
+			val.shr(BITS);
+		} while(val.valuable_chunks());
+		return result;
+	}
+
+	template <int BASE, typename std::enable_if<((BASE > 2) && (BASE < 16)), int>::type = 0>
+	std::string store_base_any_str_unsigned() const {
+		static BIG_INT_CONSTEXPR BigInt denom(BASE);
+		BigInt val(*this);
+		std::string result;
+		do {
+			const BigInt div_result = val.div_unsigned(denom);
+			result.push_back(BigIntDigitHolder::get_digit((val.number[0])));
+			val = div_result;
+		} while(val.valuable_chunks());
+		return result;
 	}
 
 	// Bitwise operators.
@@ -928,7 +1009,7 @@ protected:
 		chunk_add_offset(1u, 0);
 	}
 
-	BIG_INT_CONSTEXPR static size_t parse_hex_char(const char ch) {
+	static BIG_INT_CONSTEXPR size_t parse_any_base_char(const char ch) {
 		size_t result = SIZE_MAX;
 		if((ch >= '0') && (ch <= '9')) {
 			result = ch - '0';
@@ -940,12 +1021,24 @@ protected:
 		return result;
 	}
 
-	static size_t parse_dec_char(const char ch) {
-		size_t result = SIZE_MAX;
-		if((ch >= '0') && (ch <= '9')) {
-			result = ch - '0';
+	static BIG_INT_CONSTEXPR size_t str_base(const char* str, int& base) {
+		const char* str_begin = str;
+		if(*str == '0') {
+			if((str[1u] == 'x') || (str[1u] == 'X')) {
+				str += 2u;
+				base = 16;
+			} else if((str[1u] == 'q') || (str[1u] == 'Q')) {
+				str += 2u;
+				base = 4;
+			} else if((str[1u] == 'b') || (str[1u] == 'B')) {
+				str += 2u;
+				base = 2;
+			} else if((str[1u] >= '0') && (str[1u] <= '9')) {
+				++str;
+				base = 8;
+			}
 		}
-		return result;
+		return str - str_begin;
 	}
 
 };
