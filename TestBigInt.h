@@ -4,11 +4,12 @@
 #include "test_environment.h"
 
 #include <vector>
-#include <cstdlib>
 #include <climits>
 #include <limits>
 #include <cstdio>
 #include <chrono>
+
+using namespace bint;
 
 class TestBigInt {
 
@@ -16,24 +17,6 @@ class TestBigInt {
 
 	static constexpr size_t AUTOTEST_ROUNDS = 100000u;
 	static constexpr size_t PERFORMANCE_TEST_ROUNDS = 100000u;
-
-	template <typename T, size_t BYTES_MAX = sizeof(T), typename std::enable_if<(BYTES_MAX <= sizeof(T)), int>::type = 0>
-	struct RndIntGen {
-		static_assert(RAND_MAX > 0xFF, "rand() range is narrower than one byte.");
-
-		T next() {
-			T result = T(0);
-			size_t bytes = (std::abs(rand()) % BYTES_MAX) + 1u;
-			while(bytes--) {
-				result <<= CHAR_BIT;
-				result += T(rand() & 0xFF);
-			}
-			if(rand() > (RAND_MAX / 2)) {
-				result = -result;
-			}
-			return result;
-		}
-	};
 
 	template <size_t WIDTH>
 	using NotWiderInteger =
@@ -229,8 +212,6 @@ public:
 		ASSERT(bint.load_str("-0x") == 0);
 		ASSERT(bint.load_str("za") == 0);
 
-		ASSERT(bint == BigType_t(-1));
-
 		test_load_store_string_value<BigType_t, Integer>(bint, -1);
 		test_load_store_string_value<BigType_t, Integer>(bint, 0);
 		test_load_store_string_value<BigType_t, Integer>(bint, 1);
@@ -254,7 +235,7 @@ public:
 		BigType_t base_any_ref;
 		for(int i = 2; i < 17; ++i) {
 			const std::string str_base_any = bint.store_str(i);
-			ASSERT(base_any_ref.load_str(str_base_any.c_str(), i));
+			ASSERT(base_any_ref.load_str(str_base_any.c_str(), nullptr, i));
 			ASSERT(base_any_ref == bint);
 		}
 
