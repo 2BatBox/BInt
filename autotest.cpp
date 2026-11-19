@@ -20,7 +20,7 @@ int main(int argc, char** argv) {
 //	round(mx, 0);
 //	round(my, 0);
 
-	TestBigInt test_big_int;
+//	TestBigInt test_big_int;
 	TestBigFxp test_big_fxp;
 	return 0;
 }

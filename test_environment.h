@@ -17,7 +17,7 @@ template <typename T, size_t BYTES_MAX = sizeof(T), typename std::enable_if<(BYT
 struct RndIntGen {
 	static_assert(RAND_MAX > 0xFF, "rand() range is narrower than one byte.");
 
-	T next() {
+	static T next() {
 		T result = T(0);
 		size_t bytes = (std::abs(rand()) % BYTES_MAX) + 1u;
 		while(bytes--) {

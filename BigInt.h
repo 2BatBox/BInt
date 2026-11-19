@@ -128,6 +128,17 @@ struct BigInt {
 	}
 
 	// ----------------------------------------------------------------------------
+	// Public helpers.
+	// ----------------------------------------------------------------------------
+	BIG_INT_CONSTEXPR bool is_zero() const {
+		return valuable_chunks() == 0;
+	}
+
+	BIG_INT_CONSTEXPR bool msbit() const {
+		return number[NUMBER_WIDTH_CHUNKS - 1u] & MSBIT_MASK;
+	}
+
+	// ----------------------------------------------------------------------------
 	// Bounds and limits.
 	// ----------------------------------------------------------------------------
 
@@ -346,9 +357,6 @@ struct BigInt {
 		return result.operator%=(rv);
 	}
 
-	BIG_INT_CONSTEXPR bool msbit() const {
-		return number[NUMBER_WIDTH_CHUNKS - 1u] & MSBIT_MASK;
-	}
 
 	BIG_INT_CONSTEXPR size_t load_str(const char* str, const char* const str_end = nullptr, int base = 0 /* autoset by prefix*/) {
 		const char* const str_begin = str;
@@ -962,10 +970,6 @@ protected:
 			}
 		}
 		return result;
-	}
-
-	BIG_INT_CONSTEXPR bool is_zero() const {
-		return valuable_chunks() == 0;
 	}
 
 	BIG_INT_CONSTEXPR size_t most_valuable_half_chunk_idx() const {

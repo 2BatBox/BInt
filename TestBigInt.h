@@ -87,16 +87,12 @@ public:
 		srand(0);
 
 		// Type conversion tests.
+		test_type_conversion_int_to_bigint();
 		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGER(test_load_store_int, AUTOTEST_ROUNDS);
 		ITERATE_BIGINT_AND_NOT_WIDER_INTEGER(test_load_store_int, AUTOTEST_ROUNDS);
 		ITERATE_BIGINT_AND_WIDER_BIGINT(test_load_store_big_int, AUTOTEST_ROUNDS);
 		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGER(test_load_store_string, AUTOTEST_ROUNDS);
 
-		ITERATE_BIGINT_AND_NOT_WIDER_INTEGER(test_load_store_string, AUTOTEST_ROUNDS); // TODO: remove
-
-		test_type_conversion_int_to_bigint();
-
-		// Test BigInt arithmetic operations comparing the results with the equal sized integral integer types.
 		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGER(test_cmp_int_min_max, AUTOTEST_ROUNDS);
 		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGER(test_cmp_int_bitwise, AUTOTEST_ROUNDS);
 		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGER(test_cmp_int_shift, AUTOTEST_ROUNDS);
@@ -144,7 +140,6 @@ public:
 	template <typename BigType_t, typename Integer>
 	void test_load_store_int(size_t rounds) {
 		static_assert(sizeof(BigType_t) >= sizeof(Integer), "Size assert");
-		RndIntGen<Integer> gen;
 		BigType_t bint;
 
 		test_load_store_int_value<BigType_t, Integer>(bint, -1);
@@ -154,7 +149,7 @@ public:
 		test_load_store_int_value<BigType_t, Integer>(bint, std::numeric_limits<Integer>::max());
 
 		while(rounds--) {
-			test_load_store_int_value(bint, gen.next());
+			test_load_store_int_value(bint, RndIntGen<Integer>::next());
 		}
 	}
 
@@ -198,7 +193,6 @@ public:
 	template <typename BigType_t, typename Integer>
 	void test_load_store_string(size_t rounds) {
 		static_assert(sizeof(BigType_t) >= sizeof(Integer), "Size assert");
-		RndIntGen<Integer> gen;
 		BigType_t bint(-1);
 
 		ASSERT(bint.load_str("") == 0);
@@ -219,7 +213,7 @@ public:
 		test_load_store_string_value<BigType_t, Integer>(bint, std::numeric_limits<Integer>::max());
 
 		while(rounds--) {
-			test_load_store_string_value(bint, gen.next());
+			test_load_store_string_value(bint, RndIntGen<Integer>::next());
 		}
 	}
 
@@ -330,13 +324,12 @@ public:
 	template <typename BigType_t, typename Integer>
 	void test_cmp_int_bitwise(size_t rounds) {
 		static_assert(BigType_t::NUMBER_WIDTH_BYTES >= sizeof(Integer), "Size assert");
-		RndIntGen<Integer> gen;
 		BigType_t bx;
 		BigType_t by;
 		BigType_t bop;
 		while(rounds--) {
-			const Integer ix = gen.next();
-			const Integer iy = gen.next();
+			const Integer ix = RndIntGen<Integer>::next();
+			const Integer iy = RndIntGen<Integer>::next();
 			Integer iop;
 			bx = ix;
 			by = iy;
@@ -345,7 +338,7 @@ public:
 			test_equal<BigType_t, Integer>(~bx, ~ix);
 			test_equal<BigType_t, Integer>(~by, ~iy);
 
-			// X vx X
+			// X vs X
 			test_equal<BigType_t, Integer>((bx | bx), (ix | ix));
 			test_equal<BigType_t, Integer>((bx | ix), (ix | ix));
 			test_equal<BigType_t, Integer>((ix | bx), (ix | ix));
@@ -358,7 +351,7 @@ public:
 			test_equal<BigType_t, Integer>((bx ^ ix), (ix ^ ix));
 			test_equal<BigType_t, Integer>((ix ^ bx), (ix ^ ix));
 
-			// X vx Y
+			// X vs Y
 			test_equal<BigType_t, Integer>((bx & by), (ix & iy));
 			test_equal<BigType_t, Integer>((by & bx), (iy & ix));
 			test_equal<BigType_t, Integer>((bx & iy), (ix & iy));
@@ -374,7 +367,7 @@ public:
 			test_equal<BigType_t, Integer>((bx ^ iy), (ix ^ iy));
 			test_equal<BigType_t, Integer>((ix ^ by), (ix ^ iy));
 
-			// X vx X
+			// X vs X
 			bop = bx;
 			iop = ix;
 			bop |= bop;
@@ -393,7 +386,7 @@ public:
 			iop ^= iop;
 			test_equal<BigType_t, Integer>(bop, iop);
 
-			// X vx Y
+			// X vs Y
 			bop = bx;
 			iop = ix;
 			bop |= by;
@@ -417,14 +410,12 @@ public:
 	template <typename BigType_t, typename Integer>
 	void test_cmp_int_shift(size_t rounds) {
 		static_assert(BigType_t::NUMBER_WIDTH_BYTES >= sizeof(Integer), "Size assert");
-		RndIntGen<Integer> gen;
-		RndIntGen<size_t> gen_shift;
 		BigType_t bx;
 		BigType_t bop;
 		while(rounds--) {
-			const Integer ix = gen.next();
+			const Integer ix = RndIntGen<Integer>::next();
 			Integer iop;
-			const size_t shift = (gen_shift.next() % (sizeof(Integer) * CHAR_BIT - 1u));
+			const size_t shift = (RndIntGen<size_t>::next() % (sizeof(Integer) * CHAR_BIT - 1u));
 			bx = ix;
 			test_equal<BigType_t, Integer>(bx, ix);
 			test_equal<BigType_t, Integer>(bx << shift, ix << shift);
@@ -454,12 +445,11 @@ public:
 	template <typename BigType_t, typename Integer>
 	void test_cmp_int_relational(size_t rounds) {
 		static_assert(BigType_t::NUMBER_WIDTH_BYTES >= sizeof(Integer), "Size assert");
-		RndIntGen<Integer> gen;
 		BigType_t bx;
 		BigType_t by;
 		while(rounds--) {
-			const Integer ix = gen.next();
-			const Integer iy = gen.next();
+			const Integer ix = RndIntGen<Integer>::next();
+			const Integer iy = RndIntGen<Integer>::next();
 			bx = ix;
 			by = iy;
 			test_equal<BigType_t, Integer>(bx, ix);
@@ -520,13 +510,12 @@ public:
 		test_equal(++BigType_t::max(), BigType_t::min());
 		test_equal(--BigType_t::min(), BigType_t::max());
 
-		RndIntGen<Integer> gen;
 		BigType_t bx;
 		BigType_t by;
 		BigType_t bop;
 		while(rounds--) {
-			const Integer ix = gen.next();
-			const Integer iy = gen.next();
+			const Integer ix = RndIntGen<Integer>::next();
+			const Integer iy = RndIntGen<Integer>::next();
 			Integer iop;
 			bx = ix;
 			by = iy;
@@ -615,13 +604,12 @@ public:
 	template <typename BigType_t, typename Integer>
 	void test_cmp_int_mult(size_t rounds) {
 		static_assert(BigType_t::NUMBER_WIDTH_BYTES >= sizeof(Integer), "Size assert");
-		RndIntGen<Integer> gen;
 		BigType_t bx;
 		BigType_t by;
 		BigType_t bop;
 		while(rounds--) {
-			const Integer ix = gen.next();
-			const Integer iy = gen.next();
+			const Integer ix = RndIntGen<Integer>::next();
+			const Integer iy = RndIntGen<Integer>::next();
 			Integer iop;
 			bx = ix;
 			by = iy;
@@ -662,17 +650,16 @@ public:
 	template <typename BigType_t, typename Integer>
 	void test_cmp_int_div_mod(size_t rounds) {
 		static_assert(BigType_t::NUMBER_WIDTH_BYTES >= sizeof(Integer), "Size assert");
-		RndIntGen<Integer> gen;
-		RndIntGen<Integer, (sizeof(Integer) / 2u + 1u)> gen_sqrt;
+		using SqrtGen = RndIntGen<Integer, (sizeof(Integer) / 2u + 1u)>;
 
 		BigType_t bx;
 		BigType_t by;
 		BigType_t bop;
 		while(rounds--) {
-			const Integer ix = gen.next();
-			Integer iy = gen_sqrt.next();
+			const Integer ix = RndIntGen<Integer>::next();
+			Integer iy = SqrtGen::next();
 			while(iy == 0) {
-				iy = gen_sqrt.next();
+				iy = SqrtGen::next();
 			}
 			Integer iop;
 			bx = ix;
@@ -721,11 +708,9 @@ public:
 	template <typename BigType_t, typename Integer>
 	void test_cmp_int_sign_change(size_t rounds) {
 		static_assert(BigType_t::NUMBER_WIDTH_BYTES >= sizeof(Integer), "Size assert");
-
-		RndIntGen<Integer> gen;
 		BigType_t bx;
 		while(rounds--) {
-			const Integer ix = gen.next();
+			const Integer ix = RndIntGen<Integer>::next();;
 			bx = ix;
 			test_equal<BigType_t, Integer>(bx, ix);
 			test_equal<BigType_t, Integer>(bx.abs(), std::abs(ix));
@@ -798,8 +783,6 @@ public:
 	size_t test_performance_add_sub(const size_t rounds, double& delay_add_ns, double& delay_sub_ns) {
 		size_t result = 0;
 
-		RndIntGen<BigType_t> gen;
-
 		std::vector<BigType_t> x_ref;
 		std::vector<BigType_t> x;
 		std::vector<BigType_t> y;
@@ -809,8 +792,8 @@ public:
 		y.resize(rounds);
 
 		for(size_t idx = 0; idx < rounds; ++idx) {
-			x[idx] = gen.next();
-			y[idx] = gen.next();
+			x[idx] = RndIntGen<BigType_t>::next();
+			y[idx] = RndIntGen<BigType_t>::next();
 			x_ref[idx] = x[idx];
 		}
 
@@ -838,7 +821,6 @@ public:
 	template <typename BigType_t>
 	size_t test_performance_mult(const size_t rounds, double& delay_mult_ns) {
 		size_t result = 0;
-		RndIntGen<BigType_t> gen;
 
 		std::vector<BigType_t> x_ref;
 		std::vector<BigType_t> x;
@@ -849,9 +831,9 @@ public:
 		y.resize(rounds);
 
 		for(size_t idx = 0; idx < rounds; ++idx) {
-			x[idx] = gen.next();
+			x[idx] = RndIntGen<BigType_t>::next();
 			do {
-				y[idx] = (gen.next() >> (sizeof(BigType_t) * CHAR_BIT / 2u));
+				y[idx] = (RndIntGen<BigType_t>::next() >> (sizeof(BigType_t) * CHAR_BIT / 2u));
 			} while(y[idx] == BigType_t(0));
 			x_ref[idx] = x[idx];
 		}
@@ -874,8 +856,6 @@ public:
 	size_t test_performance_div(const size_t rounds, double& delay_div_ns) {
 		size_t result = 0;
 
-		RndIntGen<BigType_t> gen;
-
 		std::vector<BigType_t> x_ref;
 		std::vector<BigType_t> x;
 		std::vector<BigType_t> y;
@@ -885,9 +865,9 @@ public:
 		y.resize(rounds);
 
 		for(size_t idx = 0; idx < rounds; ++idx) {
-			x[idx] = gen.next();
+			x[idx] = RndIntGen<BigType_t>::next();
 			do {
-				y[idx] = (gen.next() >> (sizeof(BigType_t) * CHAR_BIT / 2u));
+				y[idx] = (RndIntGen<BigType_t>::next() >> (sizeof(BigType_t) * CHAR_BIT / 2u));
 			} while(y[idx] == BigType_t(0));
 			x_ref[idx] = x[idx];
 		}
