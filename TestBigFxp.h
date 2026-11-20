@@ -4,6 +4,7 @@
 
 #include <vector>
 #include <cstring>
+#include <string>
 
 template <size_t W, size_t P>
 struct RndFxpGen {
@@ -18,6 +19,7 @@ struct RndFxpGen {
 class TestBigFxp {
 
 	static constexpr size_t AUTOTEST_ROUNDS = 1000u;
+	static constexpr size_t PERFORMANCE_TEST_ROUNDS = 100000u;
 	static constexpr size_t INT_BITS = sizeof(signed int) * CHAR_BIT;
 	static constexpr size_t INT_DEC_DIGITS = INT_BITS / 4u;
 
@@ -61,8 +63,11 @@ public:
 		ITERATE_INT_COMPATIBLE(test_inc_dec, AUTOTEST_ROUNDS);
 		ITERATE_INT_COMPATIBLE(test_add_sub, AUTOTEST_ROUNDS);
 		ITERATE_INT_COMPATIBLE(test_mult_div, AUTOTEST_ROUNDS);
-
+		ITERATE_INT_COMPATIBLE(test_round, AUTOTEST_ROUNDS);
 		test_type_conversion();
+
+//		test_performance_header();
+//		test_performance<512u, 30u>(PERFORMANCE_TEST_ROUNDS);
 	}
 
 private:
@@ -166,7 +171,7 @@ private:
 		tmp = x;
 		op = ++tmp;
 		ASSERT(op == (x + 1));
-		ASSERT(tmp == op);
+		ASSERT(tmp == op)
 
 		tmp = x;
 		op = tmp--;
@@ -207,26 +212,6 @@ private:
 		ASSERT((x + y) == (y + x));
 		ASSERT((x - y) == ((-y) + x));
 
-		ASSERT(x + FxpType_t(0.0f) == x);
-		ASSERT(x - FxpType_t(0.0f) == x);
-		ASSERT(FxpType_t(0.0f) + x == x);
-		ASSERT(FxpType_t(0.0f) - x == (-x));
-
-		ASSERT(x + FxpType_t(0.0) == x);
-		ASSERT(x - FxpType_t(0.0) == x);
-		ASSERT(FxpType_t(0.0) + x == x);
-		ASSERT(FxpType_t(0.0) - x == (-x));
-
-		ASSERT(x + FxpType_t(1.0f) == (x + 1));
-		ASSERT(x - FxpType_t(1.0f) == (x - 1));
-		ASSERT(FxpType_t(1.0f) + x == (1 + x));
-		ASSERT(FxpType_t(1.0f) - x == (1 - x));
-
-		ASSERT(x + FxpType_t(1.0) == (x + 1));
-		ASSERT(x - FxpType_t(1.0) == (x - 1));
-		ASSERT(FxpType_t(1.0) + x == (1 + x));
-		ASSERT(FxpType_t(1.0) - x == (1 - x));
-
 		ASSERT((res_add - y) == x);
 		ASSERT((res_add - x) == y);
 		ASSERT((res_sub + y) == x);
@@ -256,6 +241,10 @@ private:
 	template <typename FxpType_t>
 	void test_mult_div_value(const FxpType_t x) {
 		FxpType_t op = x;
+		FxpType_t two = 2;
+		FxpType_t five = 5;
+
+		// FxpInt vs Integer.
 		op = op * 2;
 		ASSERT((x == 0) || (op != x));
 		op = op / 2;
@@ -267,34 +256,63 @@ private:
 		op /= 2;
 		ASSERT(op == x);
 
-		op = op * 2;
+		// Integer vs FxpInt.
+		op = 2 * op;
 		ASSERT((x == 0) || (op != x));
 		op = op / 2;
 		ASSERT(op == x);
 
-		op = x;
-		op = op * FxpType_t(5.0f);
+		// FxpInt vs FxpInt.
+		op = op * five;
 		ASSERT((x == 0) || (op != x));
-		op = op / FxpType_t(5.0f);
+		op = op / five;
 		ASSERT(op == x);
 
 		op = x;
-		op *= FxpType_t(5.0f);
+		op *= two;
 		ASSERT((x == 0) || (op != x));
-		op /= FxpType_t(5.0f);
+		op /= two;
 		ASSERT(op == x);
+	}
 
-		op = x;
-		op = op * FxpType_t(10.0);
-		ASSERT((x == 0) || (op != x));
-		op = op / FxpType_t(10.0);
-		ASSERT(op == x);
+	template <size_t W, size_t P>
+	void test_round(size_t rounds) {
+		using Type_t = bint::BigFxp<W, P>;
 
-		op = x;
-		op *= FxpType_t(10.0);
-		ASSERT((x == 0) || (op != x));
-		op /= FxpType_t(10.0);
-		ASSERT(op == x);
+		test_round_value<W, P>(Type_t(0));
+		test_round_value<W, P>(++Type_t::min());
+		test_round_value<W, P>(--Type_t::max());
+
+		while(rounds--) {
+			auto val = RndFxpGen<W, P>::next();
+			if(val.is_negative()) {
+				++val;
+			} else {
+				--val;
+			}
+			test_round_value<W, P>(val);
+		}
+	}
+
+	template <size_t W, size_t P>
+	void test_round_value(const bint::BigFxp<W, P>& x) {
+		ASSERT(x.round_ceil(P) == x);
+		ASSERT(x.round(P) == x);
+		ASSERT(x.round_floor(P) == x);
+
+		for(size_t dig = 0; dig < P; ++dig) {
+			ASSERT(x.round_floor(dig) <= x.round(dig));
+			ASSERT(x.round_ceil(dig) >= x.round(dig));
+			ASSERT(x.round_floor(dig) <= x);
+			ASSERT(x.round_ceil(dig) >= x);
+
+			ASSERT(x.round_floor(dig) > (x - 1));
+			ASSERT(x.round_ceil(dig) < (x + 1));
+
+			if(x.round_floor(dig) != x) {
+				ASSERT(x.round_floor(dig) < x.round_ceil(dig));
+			}
+		}
 	}
 
 
@@ -311,8 +329,6 @@ private:
 		int8_t i8 = 0;
 		int16_t i16 = 0;
 		int32_t i32 = 0;
-		float fl = 0.;
-		double dbl = 0.;
 
 		Type28i4f x28i4f;
 		Type18i14f x18i14f;
@@ -330,14 +346,57 @@ private:
 		x15i17f = static_cast<Type15i17f>(i16);
 		x15i17f = static_cast<Type15i17f>(i32);
 
-		x28i4f = static_cast<Type28i4f>(fl);
-		x18i14f = static_cast<Type18i14f>(fl);
-		x15i17f = static_cast<Type15i17f>(fl);
+	}
 
-		x28i4f = static_cast<Type28i4f>(dbl);
-		x18i14f = static_cast<Type18i14f>(dbl);
-		x15i17f = static_cast<Type15i17f>(dbl);
 
+	// -----------------------------------------------------------------------
+	// Performance test.
+	// -----------------------------------------------------------------------
+	void test_performance_header() {
+		printf("| Width bits | Dec digits |               Round |   Store/Load double |      Multiplication |            Division |\n");
+	}
+
+	template <size_t W, size_t P>
+	void test_performance(size_t rounds) {
+		srand(0);
+		double delay_round;
+		size_t result = 0;
+		result += test_performance_round<W, P>(rounds, delay_round);
+		printf("| %10zu | %10zu | %16.4f ns | %16.4f ns | %16.4f ns | %16.4f ns |", W, P, delay_round, delay_round, delay_round, delay_round);
+		printf("    checksum [%zu]\n", result);
+	}
+
+	template <size_t W, size_t P>
+	size_t test_performance_round(const size_t rounds, double& delay) {
+		using Type_t = bint::BigFxp<W, P>;
+		size_t result = 0;
+
+		std::vector<Type_t> input;
+		std::vector<Type_t> output;
+		std::vector<size_t> digits;
+
+		input.resize(rounds);
+		output.resize(rounds);
+		digits.resize(rounds);
+
+		for(size_t idx = 0; idx < rounds; ++idx) {
+			input[idx] = RndFxpGen<W, P>::next();
+			digits[idx] = std::abs(rand()) % P;
+		}
+
+		std::chrono::steady_clock::time_point clk_before = std::chrono::steady_clock::now();
+		for(size_t idx = 0; idx < rounds; ++idx) {
+			output[idx] = input[idx].round(digits[idx]);
+		}
+		const auto delay_add = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - clk_before);
+		delay = static_cast<double>(delay_add.count()) / rounds;
+
+		for(size_t idx = 0; idx < rounds; ++idx) {
+			result += (output[idx] == 0);
+		}
+
+		return result;
 	}
 
 };
+

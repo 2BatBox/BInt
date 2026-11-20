@@ -91,7 +91,7 @@ public:
 		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGER(test_load_store_int, AUTOTEST_ROUNDS);
 		ITERATE_BIGINT_AND_NOT_WIDER_INTEGER(test_load_store_int, AUTOTEST_ROUNDS);
 		ITERATE_BIGINT_AND_WIDER_BIGINT(test_load_store_big_int, AUTOTEST_ROUNDS);
-		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGER(test_load_store_string, AUTOTEST_ROUNDS);
+		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGER(test_load_store_stringing, AUTOTEST_ROUNDS);
 
 		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGER(test_cmp_int_min_max, AUTOTEST_ROUNDS);
 		ITERATE_BIGINT_AND_EQUAL_WIDTH_INTEGER(test_cmp_int_bitwise, AUTOTEST_ROUNDS);
@@ -191,45 +191,45 @@ public:
 	}
 
 	template <typename BigType_t, typename Integer>
-	void test_load_store_string(size_t rounds) {
+	void test_load_store_stringing(size_t rounds) {
 		static_assert(sizeof(BigType_t) >= sizeof(Integer), "Size assert");
 		BigType_t bint(-1);
 
-		ASSERT(bint.load_str("") == 0);
-		ASSERT(bint.load_str("+") == 0);
-		ASSERT(bint.load_str("-") == 0);
-		ASSERT(bint.load_str(".0") == 0);
-		ASSERT(bint.load_str("++0") == 0);
-		ASSERT(bint.load_str("--0") == 0);
-		ASSERT(bint.load_str("0x") == 0);
-		ASSERT(bint.load_str("+0x") == 0);
-		ASSERT(bint.load_str("-0x") == 0);
-		ASSERT(bint.load_str("za") == 0);
+		ASSERT(bint.load_string("") == 0);
+		ASSERT(bint.load_string("+") == 0);
+		ASSERT(bint.load_string("-") == 0);
+		ASSERT(bint.load_string(".0") == 0);
+		ASSERT(bint.load_string("++0") == 0);
+		ASSERT(bint.load_string("--0") == 0);
+		ASSERT(bint.load_string("0x") == 0);
+		ASSERT(bint.load_string("+0x") == 0);
+		ASSERT(bint.load_string("-0x") == 0);
+		ASSERT(bint.load_string("za") == 0);
 
-		test_load_store_string_value<BigType_t, Integer>(bint, -1);
-		test_load_store_string_value<BigType_t, Integer>(bint, 0);
-		test_load_store_string_value<BigType_t, Integer>(bint, 1);
-		test_load_store_string_value<BigType_t, Integer>(bint, std::numeric_limits<Integer>::min());
-		test_load_store_string_value<BigType_t, Integer>(bint, std::numeric_limits<Integer>::max());
+		test_load_store_stringing_value<BigType_t, Integer>(bint, -1);
+		test_load_store_stringing_value<BigType_t, Integer>(bint, 0);
+		test_load_store_stringing_value<BigType_t, Integer>(bint, 1);
+		test_load_store_stringing_value<BigType_t, Integer>(bint, std::numeric_limits<Integer>::min());
+		test_load_store_stringing_value<BigType_t, Integer>(bint, std::numeric_limits<Integer>::max());
 
 		while(rounds--) {
-			test_load_store_string_value(bint, RndIntGen<Integer>::next());
+			test_load_store_stringing_value(bint, RndIntGen<Integer>::next());
 		}
 	}
 
 	template <typename BigType_t, typename Integer>
-	void test_load_store_string_value(BigType_t& bint, const Integer& int_ref) {
+	void test_load_store_stringing_value(BigType_t& bint, const Integer& int_ref) {
 		// dec
 		const std::string str_dec_in = std::to_string(int_ref);
-		ASSERT(bint.load_str(str_dec_in.c_str()));
-		const std::string str_dec_out = bint.store_str(10);
+		ASSERT(bint.load_string(str_dec_in.c_str()));
+		const std::string str_dec_out = bint.store_string(10);
 		ASSERT(str_dec_in == str_dec_out);
 
 		// hex
 		BigType_t base_any_ref;
 		for(int i = 2; i < 17; ++i) {
-			const std::string str_base_any = bint.store_str(i);
-			ASSERT(base_any_ref.load_str(str_base_any.c_str(), nullptr, i));
+			const std::string str_base_any = bint.store_string(i);
+			ASSERT(base_any_ref.load_string(str_base_any.c_str(), nullptr, i));
 			ASSERT(base_any_ref == bint);
 		}
 
@@ -740,7 +740,7 @@ public:
 		static constexpr BiChar_t BI_CHAR('A');
 		static constexpr BiChar_t BI_CHAR_NEXT = 'B';
 		static constexpr BiShort_t BI_SHORT = short(-1);
-		static constexpr BiInt_t BI_INT("0x7F");
+		static constexpr BiInt_t BI_INT(0x7F);
 		static constexpr BiLong_t BI_LONG = 0x0ABC;
 
 		static_assert((BI_CHAR + BiChar_t(1)) == BI_CHAR_NEXT, "_");

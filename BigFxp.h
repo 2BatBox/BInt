@@ -28,23 +28,15 @@ struct BigFxp {
 	static constexpr IntValue BASE = IntValue(10);
 	static constexpr IntValue LIMIT_MULT_BASE = IntValue(-1).div_unsigned(BASE);
 
-	template <typename T>
-	static constexpr T ten_mult(T val, size_t exp) {
-		while(exp--) {
-			val *= T(10);
+	static constexpr IntValue int_value_ten_exp(size_t arg) {
+		IntValue result(1);
+		while(arg--) {
+			result.chunk_mult(10u);
 		}
-		return val;
+		return result;
 	}
 
-	template <typename T>
-	static constexpr T ten_div(T val, size_t exp) {
-		while(exp--) {
-			val /= T(10);
-		}
-		return val;
-	}
-
-	static constexpr IntValue INT_MULIPLIER = ten_mult(IntValue(1), FRAC_DIGITS);
+	static constexpr IntValue INT_MULIPLIER = int_value_ten_exp(FRAC_DIGITS);
 	static constexpr WiderIntValue INT_MULIPLIER_WIDER = WiderIntValue(INT_MULIPLIER);
 	static constexpr WiderIntValue INT_HALF_MULIPLIER = INT_MULIPLIER_WIDER >> 1u;
 
@@ -72,9 +64,6 @@ public:
 
 	template <typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) > INT_PART_WIDTH_BITES), int>::type = 0>
 	constexpr explicit BigFxp(const T& init) : _int_value(IntValue(init) * INT_MULIPLIER) {}
-
-	template <typename T, typename std::enable_if<(std::is_floating_point<T>::value), int>::type = 0>
-	constexpr explicit BigFxp(const T& init) : _int_value(static_cast<signed long long>(ten_mult(init, FRAC_DIGITS))) {}
 
 	// ----------------------------------------------------------------------------
 	// Assign operators.
@@ -115,7 +104,7 @@ public:
 	constexpr BigFxp round_ceil(const size_t digits) const {
 		IntValue result(_int_value);
 		if(digits < FRAC_DIGITS) {
-			const IntValue exp(ten_mult(IntValue(1), FRAC_DIGITS - digits));
+			const IntValue exp(int_value_ten_exp(FRAC_DIGITS - digits));
 			const IntValue res_mod(result % exp);
 			if(!res_mod.is_zero()) {
 				result -= res_mod;
@@ -131,7 +120,7 @@ public:
 	constexpr BigFxp round_floor(const size_t digits) const {
 		IntValue result(_int_value);
 		if(digits < FRAC_DIGITS) {
-			const IntValue exp(ten_mult(IntValue(1), FRAC_DIGITS - digits));
+			const IntValue exp(int_value_ten_exp(FRAC_DIGITS - digits));
 			const IntValue res_mod(result % exp);
 			if(!res_mod.is_zero()) {
 				result -= res_mod;
@@ -147,7 +136,7 @@ public:
 	constexpr BigFxp round(const size_t digits) const {
 		IntValue result(_int_value);
 		if(digits < FRAC_DIGITS) {
-			const IntValue exp(ten_mult(IntValue(1), FRAC_DIGITS - digits));
+			const IntValue exp(int_value_ten_exp(FRAC_DIGITS - digits));
 			const IntValue exp_half(exp >> 1u);
 			const IntValue res_mod(result % exp);
 			if(!res_mod.is_zero()) {
@@ -166,7 +155,7 @@ public:
 	constexpr BigFxp round_drop(const size_t digits) const {
 		IntValue result(_int_value);
 		if(digits < FRAC_DIGITS) {
-			const IntValue exp(ten_mult(IntValue(1), FRAC_DIGITS - digits));
+			const IntValue exp(int_value_ten_exp(FRAC_DIGITS - digits));
 			const IntValue res_mod(result % exp);
 			if(!res_mod.is_zero()) {
 				result -= res_mod;
@@ -181,13 +170,6 @@ public:
 	template <typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value), int>::type = 0>
 	constexpr explicit operator T() const {
 		return static_cast<T>(_int_value / INT_MULIPLIER);
-	}
-
-	template <typename T, typename std::enable_if<(std::is_floating_point<T>::value), int>::type = 0>
-	constexpr explicit operator T() const {
-		const auto llsi = static_cast<signed long long>(_int_value);
-		auto result = static_cast<double>(llsi);
-		return ten_div(result, FRAC_DIGITS);
 	}
 
 	const IntValue& raw_value() const   { return _int_value; }
@@ -366,6 +348,17 @@ public:
 		}
 		std::reverse(result.begin(), result.end());
 		return result;
+	}
+
+	// ----------------------------------------------------------------------------
+	// Public helpers.
+	// ----------------------------------------------------------------------------
+	constexpr bool is_zero() const {
+		return _int_value.is_zero();
+	}
+
+	constexpr bool is_negative() const {
+		return _int_value.msbit();
 	}
 
 private:

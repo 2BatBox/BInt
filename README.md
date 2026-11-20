@@ -1,6 +1,6 @@
 # BigInt
 
-`BigInt<WIDTH_BITS>` is a header-only C++ template for **signed, fixed-width integer arithmetic**. Its width must be positive and a multiple of `CHAR_BIT`. BigInt stores values in two's complement form, using an array of unsigned machine words (also called *chunks* or *limbs*). Unlike an arbitrary-precision integer, a `BigInt` has a width fixed at compile time.
+`BigInt<WIDTH_BITS>` is a header-only C++11 template for **signed, fixed-width integer arithmetic**. Its width must be positive and a multiple of `CHAR_BIT`. BigInt stores values in two's complement form, using an array of unsigned machine words (also called *chunks* or *limbs*). Unlike an arbitrary-precision integer, a `BigInt` has a width fixed at compile time.
 
 Include `BigInt.h` to use it:
 

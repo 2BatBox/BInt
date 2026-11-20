@@ -101,12 +101,8 @@ struct BigInt {
 	}
 
 	template <size_t W>
-	BIG_INT_CONSTEXPR explicit BigInt(const BigInt<W>& rv) : number{0}{
+	BIG_INT_CONSTEXPR explicit BigInt(const BigInt<W>& rv) : number{0} {
 		load_big_int(rv);
-	}
-
-	BIG_INT_CONSTEXPR explicit BigInt(const char* str) : number{0}{
-		load_str(str);
 	}
 
 	// ----------------------------------------------------------------------------
@@ -164,6 +160,118 @@ struct BigInt {
 	BIG_INT_CONSTEXPR explicit operator T() const {
 		T result;
 		store_integer(result);
+		return result;
+	}
+
+	BIG_INT_CONSTEXPR size_t load_string(const char* str, const char* const str_end = nullptr, int base = 0 /* autoset by prefix*/) {
+		const char* const str_begin = str;
+		bool is_neg = false;
+		if((*str == '+') || (*str == '-')) {
+			is_neg = (*str == '-');
+			++str;
+		}
+
+		int base_prefix = 10;
+		str += str_base(str, base_prefix);
+		if(base == 0){
+			base = base_prefix;
+		}
+
+		clear();
+
+		size_t digits = 0;
+		bool overflown = false;
+		switch(base){
+			case 2: digits = load_base_2_str_unsigned<0x01, 1u>(str, str_end, overflown); break;
+			case 3: digits = load_base_any_str_unsigned<3>(str, str_end, overflown); break;
+			case 4: digits = load_base_2_str_unsigned<0x03, 2u>(str, str_end, overflown); break;
+			case 5: digits = load_base_any_str_unsigned<5>(str, str_end, overflown); break;
+			case 6: digits = load_base_any_str_unsigned<6>(str, str_end, overflown); break;
+			case 7: digits = load_base_any_str_unsigned<7>(str, str_end, overflown); break;
+			case 8: digits = load_base_2_str_unsigned<0x07, 3u>(str, str_end, overflown); break;
+			case 9: digits = load_base_any_str_unsigned<9>(str, str_end, overflown); break;
+			case 10: digits = load_base_any_str_unsigned<10>(str, str_end, overflown); break;
+			case 11: digits = load_base_any_str_unsigned<11>(str, str_end, overflown); break;
+			case 12: digits = load_base_any_str_unsigned<12>(str, str_end, overflown); break;
+			case 13: digits = load_base_any_str_unsigned<13>(str, str_end, overflown); break;
+			case 14: digits = load_base_any_str_unsigned<14>(str, str_end, overflown); break;
+			case 15: digits = load_base_any_str_unsigned<15>(str, str_end, overflown); break;
+			case 16: digits = load_base_2_str_unsigned<0x0F, 4u>(str, str_end, overflown); break;
+			default:
+				break;
+		}
+
+		str += digits;
+
+		const bool pass = (digits) && (!overflown) && ((!msbit()) || (is_neg && (operator==(BigInt::min()))));
+		if(pass && is_neg) {
+			sign_flip();
+		}
+		return pass ? (str - str_begin) : 0;
+	}
+
+	std::string store_string(int base = 10, bool with_prefix = true) const {
+		std::string result;
+		if((base < 2) || (base > 16)) {
+			return result;
+		}
+
+		BigInt val(*this);
+		const bool msbit = val.msbit();
+		if(msbit) {
+			val.sign_flip();
+		}
+
+		switch(base){
+			case 2: result = val.store_base_2_str_unsigned<0x01, 1u>(); break;
+			case 3: result = val.store_base_any_str_unsigned<3>(); break;
+			case 4: result = val.store_base_2_str_unsigned<0x03, 2u>(); break;
+			case 5: result = val.store_base_any_str_unsigned<5>(); break;
+			case 6: result = val.store_base_any_str_unsigned<6>(); break;
+			case 7: result = val.store_base_any_str_unsigned<7>(); break;
+			case 8: result = val.store_base_2_str_unsigned<0x07, 3u>(); break;
+			case 9: result = val.store_base_any_str_unsigned<9>(); break;
+			case 10: result = val.store_base_any_str_unsigned<10>(); break;
+			case 11: result = val.store_base_any_str_unsigned<11>(); break;
+			case 12: result = val.store_base_any_str_unsigned<12>(); break;
+			case 13: result = val.store_base_any_str_unsigned<13>(); break;
+			case 14: result = val.store_base_any_str_unsigned<14>(); break;
+			case 15: result = val.store_base_any_str_unsigned<15>(); break;
+			case 16: result = val.store_base_2_str_unsigned<0x0F, 4u>(); break;
+			default:
+				break;
+		}
+
+		if(with_prefix) {
+			switch(base){
+				case 2:
+					result.push_back('b');
+					result.push_back('0');
+					break;
+
+				case 4:
+					result.push_back('q');
+					result.push_back('0');
+					break;
+
+				case 8:
+					result.push_back('0');
+					break;
+
+				case 16:
+					result.push_back('x');
+					result.push_back('0');
+					break;
+
+				default:
+					break;
+			}
+		}
+
+		if(msbit) {
+			result.push_back('-');
+		}
+		std::reverse(result.begin(), result.end());
 		return result;
 	}
 
@@ -357,121 +465,7 @@ struct BigInt {
 		return result.operator%=(rv);
 	}
 
-
-	BIG_INT_CONSTEXPR size_t load_str(const char* str, const char* const str_end = nullptr, int base = 0 /* autoset by prefix*/) {
-		const char* const str_begin = str;
-		bool is_neg = false;
-		if((*str == '+') || (*str == '-')) {
-			is_neg = (*str == '-');
-			++str;
-		}
-
-		int base_prefix = 10;
-		str += str_base(str, base_prefix);
-		if(base == 0){
-			base = base_prefix;
-		}
-
-		size_t digits = 0;
-		bool overflown = false;
-
-		clear();
-		switch(base){
-			case 2: digits = load_base_2_str_unsigned<0x01, 1u>(str, str_end, overflown); break;
-			case 3: digits = load_base_any_str_unsigned<3>(str, str_end, overflown); break;
-			case 4: digits = load_base_2_str_unsigned<0x03, 2u>(str, str_end, overflown); break;
-			case 5: digits = load_base_any_str_unsigned<5>(str, str_end, overflown); break;
-			case 6: digits = load_base_any_str_unsigned<6>(str, str_end, overflown); break;
-			case 7: digits = load_base_any_str_unsigned<7>(str, str_end, overflown); break;
-			case 8: digits = load_base_2_str_unsigned<0x07, 3u>(str, str_end, overflown); break;
-			case 9: digits = load_base_any_str_unsigned<9>(str, str_end, overflown); break;
-			case 10: digits = load_base_any_str_unsigned<10>(str, str_end, overflown); break;
-			case 11: digits = load_base_any_str_unsigned<11>(str, str_end, overflown); break;
-			case 12: digits = load_base_any_str_unsigned<12>(str, str_end, overflown); break;
-			case 13: digits = load_base_any_str_unsigned<13>(str, str_end, overflown); break;
-			case 14: digits = load_base_any_str_unsigned<14>(str, str_end, overflown); break;
-			case 15: digits = load_base_any_str_unsigned<15>(str, str_end, overflown); break;
-			case 16: digits = load_base_2_str_unsigned<0x0F, 4u>(str, str_end, overflown); break;
-			default:
-				break;
-		}
-
-		str += digits;
-
-		const bool pass = (digits) && (!overflown) && ((!msbit()) || (is_neg && (operator==(BigInt::min()))));
-		if(pass && is_neg) {
-			sign_flip();
-		}
-		return pass ? (str - str_begin) : 0;
-	}
-
-	std::string store_str(int base = 10, bool with_prefix = true) const {
-		std::string result;
-		if((base < 2) || (base > 16)) {
-			return result;
-		}
-
-		BigInt val(*this);
-		const bool msbit = val.msbit();
-		if(msbit) {
-			val.sign_flip();
-		}
-
-		switch(base){
-			case 2: result = val.store_base_2_str_unsigned<0x01, 1u>(); break;
-			case 3: result = val.store_base_any_str_unsigned<3>(); break;
-			case 4: result = val.store_base_2_str_unsigned<0x03, 2u>(); break;
-			case 5: result = val.store_base_any_str_unsigned<5>(); break;
-			case 6: result = val.store_base_any_str_unsigned<6>(); break;
-			case 7: result = val.store_base_any_str_unsigned<7>(); break;
-			case 8: result = val.store_base_2_str_unsigned<0x07, 3u>(); break;
-			case 9: result = val.store_base_any_str_unsigned<9>(); break;
-			case 10: result = val.store_base_any_str_unsigned<10>(); break;
-			case 11: result = val.store_base_any_str_unsigned<11>(); break;
-			case 12: result = val.store_base_any_str_unsigned<12>(); break;
-			case 13: result = val.store_base_any_str_unsigned<13>(); break;
-			case 14: result = val.store_base_any_str_unsigned<14>(); break;
-			case 15: result = val.store_base_any_str_unsigned<15>(); break;
-			case 16: result = val.store_base_2_str_unsigned<0x0F, 4u>(); break;
-			default:
-				break;
-		}
-
-		if(with_prefix) {
-			switch(base){
-				case 2:
-					result.push_back('b');
-					result.push_back('0');
-					break;
-
-				case 4:
-					result.push_back('q');
-					result.push_back('0');
-					break;
-
-				case 8:
-					result.push_back('0');
-					break;
-
-				case 16:
-					result.push_back('x');
-					result.push_back('0');
-					break;
-
-				default:
-					break;
-			}
-		}
-
-		if(msbit) {
-			result.push_back('-');
-		}
-		std::reverse(result.begin(), result.end());
-		return result;
-	}
-
 protected:
-
 
 	// Load integers.
 	template <typename T>
@@ -606,7 +600,7 @@ protected:
 	BIG_INT_CONSTEXPR size_t load_base_2_str_unsigned(const char* str, const char* const str_end, bool& overflown) {
 		const char* const str_begin = str;
 
-		while((str != str_end)) {
+		while(str != str_end) {
 			auto ch_idx = parse_any_base_char(*str);
 			if(ch_idx > MASK) {
 				break;
@@ -626,7 +620,7 @@ protected:
 		BIG_INT_CONSTEXPR unsigned BASE_UNSIGNED(BASE);
 		const char* const str_begin = str;
 
-		while((str != str_end)) {
+		while(str != str_end) {
 			auto ch_idx = parse_any_base_char(*str);
 			if(ch_idx >= BASE_UNSIGNED) {
 				break;
