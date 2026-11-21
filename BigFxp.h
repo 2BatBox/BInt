@@ -22,48 +22,44 @@ struct BigFxp {
 	static_assert(FRAC_DIGITS > 0, "BigFxp: FRAC_DIGITS must be greater than zero!");
 	static_assert(WIDTH_BITS > FRAC_PART_WIDTH_BITS, "BigFxp: WIDTH_BITS is not enought to store +/-1 with given FRAC_DIGITS!");
 
-	using IntValue = BigInt<WIDTH_BITS>;
-	using WiderIntValue = BigInt<WIDTH_BITS * 2u>;
+	using BigIntValue = BigInt<WIDTH_BITS>;
+	using WiderBigIntValue = BigInt<WIDTH_BITS * 2u>;
 
-	static constexpr IntValue BASE = IntValue(10);
-	static constexpr IntValue LIMIT_MULT_BASE = IntValue(-1).div_unsigned(BASE);
+	static constexpr BigIntValue BASE = BigIntValue(10);
+	static constexpr BigIntValue LIMIT_MULT_BASE = BigIntValue(-1).div_unsigned(BASE);
 
-	static constexpr IntValue int_value_ten_exp(size_t arg) {
-		IntValue result(1);
+	static constexpr BigIntValue int_value_ten_exp(size_t arg) {
+		BigIntValue result(1);
 		while(arg--) {
 			result.chunk_mult(10u);
 		}
 		return result;
 	}
 
-	static constexpr IntValue INT_MULIPLIER = int_value_ten_exp(FRAC_DIGITS);
-	static constexpr WiderIntValue INT_MULIPLIER_WIDER = WiderIntValue(INT_MULIPLIER);
-	static constexpr WiderIntValue INT_HALF_MULIPLIER = INT_MULIPLIER_WIDER >> 1u;
+	static constexpr BigIntValue INT_MULIPLIER = int_value_ten_exp(FRAC_DIGITS);
+	static constexpr WiderBigIntValue INT_MULIPLIER_WIDER = WiderBigIntValue(INT_MULIPLIER);
+	static constexpr WiderBigIntValue INT_HALF_MULIPLIER = INT_MULIPLIER_WIDER >> 1u;
 
-private:
-
-	IntValue _int_value;
-
-public:
+	BigIntValue raw_value;
 
 	// ----------------------------------------------------------------------------
 	// Public constructors.
 	// ----------------------------------------------------------------------------
 	constexpr BigFxp() = default;
 
-	constexpr BigFxp(const BigFxp& rv) : _int_value(rv._int_value) {}
+	constexpr BigFxp(const BigFxp& rv) : raw_value(rv.raw_value) {}
 
-	constexpr BigFxp(const IntValue& base, int) : _int_value(base) {}
+	constexpr BigFxp(const BigIntValue& base, int) : raw_value(base) {}
 
 	constexpr explicit BigFxp(const char* str) {
 		load_str(str);
 	}
 
 	template <typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= INT_PART_WIDTH_BITES), int>::type = 0>
-	constexpr BigFxp(const T& init) : _int_value(IntValue(init) * INT_MULIPLIER) {}
+	constexpr BigFxp(const T& init) : raw_value(BigIntValue(init) * INT_MULIPLIER) {}
 
 	template <typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) > INT_PART_WIDTH_BITES), int>::type = 0>
-	constexpr explicit BigFxp(const T& init) : _int_value(IntValue(init) * INT_MULIPLIER) {}
+	constexpr explicit BigFxp(const T& init) : raw_value(BigIntValue(init) * INT_MULIPLIER) {}
 
 	// ----------------------------------------------------------------------------
 	// Assign operators.
@@ -72,7 +68,7 @@ public:
 
 	template <typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value && sizeof(T) <= INT_PART_WIDTH_BITES), int>::type = 0>
 	constexpr BigFxp& operator=(const T& init) {
-		_int_value = IntValue(init) * INT_MULIPLIER;
+		raw_value = BigIntValue(init) * INT_MULIPLIER;
 		return *this;
 	}
 
@@ -87,25 +83,25 @@ public:
 
 	// Smallest possible change.
 	static constexpr BigFxp delta() {
-		return BigFxp(IntValue(1), 0);
+		return BigFxp(BigIntValue(1), 0);
 	}
 
 	// The maximum value the BigFxp can store.
 	static constexpr BigFxp max() {
-		return BigFxp(IntValue::max(), 0);
+		return BigFxp(BigIntValue::max(), 0);
 	}
 
 	// The minimum value the BigFxp can store.
 	static constexpr BigFxp min() {
-		return BigFxp(IntValue::min(), 0);
+		return BigFxp(BigIntValue::min(), 0);
 	}
 
 	// Round the value to the ceil.
 	constexpr BigFxp round_ceil(const size_t digits) const {
-		IntValue result(_int_value);
+		BigIntValue result(raw_value);
 		if(digits < FRAC_DIGITS) {
-			const IntValue exp(int_value_ten_exp(FRAC_DIGITS - digits));
-			const IntValue res_mod(result % exp);
+			const BigIntValue exp(int_value_ten_exp(FRAC_DIGITS - digits));
+			const BigIntValue res_mod(result % exp);
 			if(!res_mod.is_zero()) {
 				result -= res_mod;
 				if(!res_mod.msbit()) {
@@ -118,10 +114,10 @@ public:
 
 	// Round the value to the floor.
 	constexpr BigFxp round_floor(const size_t digits) const {
-		IntValue result(_int_value);
+		BigIntValue result(raw_value);
 		if(digits < FRAC_DIGITS) {
-			const IntValue exp(int_value_ten_exp(FRAC_DIGITS - digits));
-			const IntValue res_mod(result % exp);
+			const BigIntValue exp(int_value_ten_exp(FRAC_DIGITS - digits));
+			const BigIntValue res_mod(result % exp);
 			if(!res_mod.is_zero()) {
 				result -= res_mod;
 				if(res_mod.msbit()) {
@@ -134,11 +130,11 @@ public:
 
 	// Round the value to the nearest.
 	constexpr BigFxp round(const size_t digits) const {
-		IntValue result(_int_value);
+		BigIntValue result(raw_value);
 		if(digits < FRAC_DIGITS) {
-			const IntValue exp(int_value_ten_exp(FRAC_DIGITS - digits));
-			const IntValue exp_half(exp >> 1u);
-			const IntValue res_mod(result % exp);
+			const BigIntValue exp(int_value_ten_exp(FRAC_DIGITS - digits));
+			const BigIntValue exp_half(exp >> 1u);
+			const BigIntValue res_mod(result % exp);
 			if(!res_mod.is_zero()) {
 				result -= res_mod;
 				if(res_mod > exp_half) {
@@ -153,10 +149,10 @@ public:
 
 	// Drop the digits.
 	constexpr BigFxp round_drop(const size_t digits) const {
-		IntValue result(_int_value);
+		BigIntValue result(raw_value);
 		if(digits < FRAC_DIGITS) {
-			const IntValue exp(int_value_ten_exp(FRAC_DIGITS - digits));
-			const IntValue res_mod(result % exp);
+			const BigIntValue exp(int_value_ten_exp(FRAC_DIGITS - digits));
+			const BigIntValue res_mod(result % exp);
 			if(!res_mod.is_zero()) {
 				result -= res_mod;
 			}
@@ -169,21 +165,18 @@ public:
 	// ----------------------------------------------------------------------------
 	template <typename T, typename std::enable_if<(std::is_integral<T>::value && std::is_signed<T>::value), int>::type = 0>
 	constexpr explicit operator T() const {
-		return static_cast<T>(_int_value / INT_MULIPLIER);
+		return static_cast<T>(raw_value / INT_MULIPLIER);
 	}
-
-	const IntValue& raw_value() const   { return _int_value; }
-	IntValue&       raw_value()         { return _int_value; }
 
 	// ----------------------------------------------------------------------------
 	// Relational operators.
 	// ----------------------------------------------------------------------------
-	constexpr bool operator==(const BigFxp& rv) const { return _int_value == rv._int_value; }
-	constexpr bool operator!=(const BigFxp& rv) const { return _int_value != rv._int_value; }
-	constexpr bool operator> (const BigFxp& rv) const { return _int_value > rv._int_value;  }
-	constexpr bool operator>=(const BigFxp& rv) const { return _int_value >= rv._int_value; }
-	constexpr bool operator< (const BigFxp& rv) const { return _int_value < rv._int_value;  }
-	constexpr bool operator<=(const BigFxp& rv) const { return _int_value <= rv._int_value; }
+	constexpr bool operator==(const BigFxp& rv) const { return raw_value == rv.raw_value; }
+	constexpr bool operator!=(const BigFxp& rv) const { return raw_value != rv.raw_value; }
+	constexpr bool operator> (const BigFxp& rv) const { return raw_value > rv.raw_value;  }
+	constexpr bool operator>=(const BigFxp& rv) const { return raw_value >= rv.raw_value; }
+	constexpr bool operator< (const BigFxp& rv) const { return raw_value < rv.raw_value;  }
+	constexpr bool operator<=(const BigFxp& rv) const { return raw_value <= rv.raw_value; }
 
 	// ----------------------------------------------------------------------------
 	// Arithmetic operators.
@@ -191,64 +184,64 @@ public:
 
 	// Increment / Decrement
 	constexpr BigFxp& operator--() {
-		_int_value -= INT_MULIPLIER;
+		raw_value -= INT_MULIPLIER;
 		return *this;
 	}
 
 	constexpr BigFxp& operator++() {
-		_int_value += INT_MULIPLIER;
+		raw_value += INT_MULIPLIER;
 		return *this;
 	}
 
 	constexpr BigFxp operator--(int) {
-		BigFxp result(_int_value, 0);
-		_int_value -= INT_MULIPLIER;
+		BigFxp result(raw_value, 0);
+		raw_value -= INT_MULIPLIER;
 		return result;
 	}
 
 	constexpr BigFxp operator++(int) {
-		BigFxp result(_int_value, 0);
-		_int_value += INT_MULIPLIER;
+		BigFxp result(raw_value, 0);
+		raw_value += INT_MULIPLIER;
 		return result;
 	}
 
 	// Sign change operators.
 	constexpr BigFxp operator+() const {
-		return BigFxp(_int_value, 0);
+		return BigFxp(raw_value, 0);
 	}
 
 	constexpr BigFxp operator-() const {
-		return BigFxp(-_int_value, 0);
+		return BigFxp(-raw_value, 0);
 	}
 
 	BigFxp abs() const {
-		return BigFxp(_int_value.abs(), 0);
+		return BigFxp(raw_value.abs(), 0);
 	}
 
 	// Addition.
 	constexpr BigFxp& operator+=(const BigFxp& rv) {
-		_int_value += rv._int_value;
+		raw_value += rv.raw_value;
 		return *this;
 	}
 
 	constexpr BigFxp operator+(const BigFxp& rv) const {
-		return BigFxp(_int_value + rv._int_value, 0);
+		return BigFxp(raw_value + rv.raw_value, 0);
 	}
 
 	// Subtraction.
 	constexpr BigFxp& operator-=(const BigFxp& rv) {
-		_int_value -= rv._int_value;
+		raw_value -= rv.raw_value;
 		return *this;
 	}
 
 	constexpr BigFxp operator-(const BigFxp& rv) const {
-		return BigFxp(_int_value - rv._int_value, 0);
+		return BigFxp(raw_value - rv.raw_value, 0);
 	}
 
 
 	// Multiplication
 	constexpr BigFxp& operator*=(const BigFxp& val) {
-		_int_value = mult(*this, val);
+		raw_value = mult(*this, val);
 		return *this;
 	}
 
@@ -259,12 +252,12 @@ public:
 
 	// Division
 	constexpr BigFxp& operator/=(const BigFxp& val) {
-		_int_value = div(*this, val);
+		raw_value = div(this->raw_value, val.raw_value);
 		return *this;
 	}
 
 	constexpr BigFxp operator/(const BigFxp& val) const {
-		return BigFxp(div(*this, val), 0);
+		return BigFxp(div(this->raw_value, val.raw_value), 0);
 	}
 
 	size_t load_str(const char* str, const char* const str_end = nullptr) {
@@ -277,7 +270,7 @@ public:
 
 		bool overflown = false;
 
-		_int_value.clear();
+		raw_value.clear();
 
 		// Read integer part.
 		const size_t digits_int = load_dec_str_unsigned(str, str_end, overflown);
@@ -296,20 +289,20 @@ public:
 		const size_t digits = digits_int + digits_frac;
 
 		while(digits_frac < FRAC_DIGITS) {
-			overflown = overflown || _int_value.cmp_unsigned_greater(LIMIT_MULT_BASE);
-			_int_value.chunk_mult(10u);
+			overflown = overflown || raw_value.cmp_unsigned_greater(LIMIT_MULT_BASE);
+			raw_value.chunk_mult(10u);
 			++digits_frac;
 		}
 
-		const bool pass = (digits) && (!overflown) && ((!_int_value.msbit()) || (is_neg && (_int_value == IntValue::min())));
+		const bool pass = (digits) && (!overflown) && ((!raw_value.msbit()) || (is_neg && (raw_value == BigIntValue::min())));
 		if(pass && is_neg) {
-			_int_value.sign_flip();
+			raw_value.sign_flip();
 		}
 		return pass ? (str - str_begin) : 0;
 	}
 
 	std::string store_str() const {
-		IntValue val(_int_value);
+		BigIntValue val(raw_value);
 		const bool msbit = val.msbit();
 		if(msbit) {
 			val.sign_flip();
@@ -354,44 +347,47 @@ public:
 	// Public helpers.
 	// ----------------------------------------------------------------------------
 	constexpr bool is_zero() const {
-		return _int_value.is_zero();
+		return raw_value.is_zero();
 	}
 
 	constexpr bool is_negative() const {
-		return _int_value.msbit();
+		return raw_value.msbit();
 	}
 
-private:
+	static constexpr BigFxp frac(const BigIntValue& num, const BigIntValue& denom) {
+		return BigFxp(div(num, denom), 0);
+	}
+
+protected:
 
 	constexpr size_t load_dec_str_unsigned(const char* str, const char* const str_end, bool& overflown) {
 		const char* const str_begin = str;
 		while((str != str_end) && (*str >= '0') && (*str <= '9')) {
 			const char ch = *str - '0';
-			overflown = overflown || _int_value.cmp_unsigned_greater(LIMIT_MULT_BASE);
-			_int_value.chunk_mult(10u);
-			overflown = overflown || _int_value.chunk_add_offset(ch, 0);
+			overflown = overflown || raw_value.cmp_unsigned_greater(LIMIT_MULT_BASE);
+			raw_value.chunk_mult(10u);
+			overflown = overflown || raw_value.chunk_add_offset(ch, 0);
 			++str;
 		}
 		return str - str_begin;
 	}
 
-	static constexpr IntValue mult(const BigFxp& x, const BigFxp& y) {
-		WiderIntValue xy_mult(x._int_value);
-		xy_mult.mult(WiderIntValue(y._int_value));
-		const WiderIntValue int_div(xy_mult.div(INT_MULIPLIER_WIDER));
-		const WiderIntValue tail_round(xy_mult.div(INT_HALF_MULIPLIER));
-		return IntValue(int_div + tail_round);
+	static constexpr BigIntValue mult(const BigFxp& x, const BigFxp& y) {
+		WiderBigIntValue xy_mult(x.raw_value);
+		xy_mult.mult(WiderBigIntValue(y.raw_value));
+		const WiderBigIntValue int_div(xy_mult.div(INT_MULIPLIER_WIDER));
+		const WiderBigIntValue tail_round(xy_mult.div(INT_HALF_MULIPLIER));
+		return BigIntValue(int_div + tail_round);
 	}
 
-	static constexpr IntValue div(const BigFxp& x, const BigFxp& y) {
-		const WiderIntValue x_raw(x._int_value);
-		const WiderIntValue y_raw(y._int_value);
-		const WiderIntValue x_raw_mult_ten_exp(x_raw * INT_MULIPLIER_WIDER);
-		return IntValue
+	static constexpr BigIntValue div(const BigIntValue& x, const BigIntValue& y) {
+		const WiderBigIntValue y_wide(y);
+		const WiderBigIntValue x_mult_ten_exp_wide(WiderBigIntValue(x) * INT_MULIPLIER_WIDER);
+		return BigIntValue
 		(
-			(x._int_value.msbit() == y._int_value.msbit()) ?
-			((x_raw_mult_ten_exp + (y_raw >> 1u)) / y_raw) :
-			((x_raw_mult_ten_exp - (y_raw >> 1u)) / y_raw)
+			(x.msbit() == y.msbit()) ?
+			((x_mult_ten_exp_wide + (y_wide >> 1u)) / y_wide) :
+			((x_mult_ten_exp_wide - (y_wide >> 1u)) / y_wide)
 		);
 	}
 

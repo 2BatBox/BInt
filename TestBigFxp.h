@@ -11,7 +11,7 @@ struct RndFxpGen {
 	using Type_t = bint::BigFxp<W, P>;
 
 	static bint::BigFxp<W, P> next() {
-		Type_t result(RndIntGen<typename Type_t::IntValue>::next(), 0);
+		Type_t result(RndIntGen<typename Type_t::BigIntValue>::next(), 0);
 		return result;
 	}
 };
@@ -124,17 +124,17 @@ private:
 			ASSERT(not (x < x));
 
 			// X vs Y
-			ASSERT((x == y) == (x.raw_value() == y.raw_value()));
-			ASSERT((y == x) == (y.raw_value() == x.raw_value()));
+			ASSERT((x == y) == (x.raw_value == y.raw_value));
+			ASSERT((y == x) == (y.raw_value == x.raw_value));
 
-			ASSERT((x != y) == (x.raw_value() != y.raw_value()));
-			ASSERT((y != x) == (y.raw_value() != x.raw_value()));
+			ASSERT((x != y) == (x.raw_value != y.raw_value));
+			ASSERT((y != x) == (y.raw_value != x.raw_value));
 
-			ASSERT((x > y) == (x.raw_value() > y.raw_value()));
-			ASSERT((x < y) == (x.raw_value() < y.raw_value()));
+			ASSERT((x > y) == (x.raw_value > y.raw_value));
+			ASSERT((x < y) == (x.raw_value < y.raw_value));
 
-			ASSERT((x >= y) == (x.raw_value() >= y.raw_value()));
-			ASSERT((x <= y) == (x.raw_value() <= y.raw_value()));
+			ASSERT((x >= y) == (x.raw_value >= y.raw_value));
+			ASSERT((x <= y) == (x.raw_value <= y.raw_value));
 		}
 	}
 
