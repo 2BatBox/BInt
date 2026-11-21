@@ -13,6 +13,9 @@ template <size_t WIDTH_BITS, size_t FRAC_DIGITS>
 struct BigFxp {
 
 	static constexpr double LOG_BASE_2_10 = 3.321928095; // Rounded to the ceil.
+	static constexpr size_t NUMBER_DEC_DIGITS_FLOOR = (WIDTH_BITS - 1u) / LOG_BASE_2_10;
+	static constexpr size_t INT_DEC_DIGITS_FLOOR = NUMBER_DEC_DIGITS_FLOOR - FRAC_DIGITS;
+
 	static constexpr size_t FRAC_PART_WIDTH_BITS = LOG_BASE_2_10 * FRAC_DIGITS + 1;
 	static constexpr size_t FRAC_PART_WIDTH_BYTES = FRAC_PART_WIDTH_BITS / CHAR_BIT;
 
@@ -21,6 +24,7 @@ struct BigFxp {
 
 	static_assert(FRAC_DIGITS > 0, "BigFxp: FRAC_DIGITS must be greater than zero!");
 	static_assert(WIDTH_BITS > FRAC_PART_WIDTH_BITS, "BigFxp: WIDTH_BITS is not enought to store +/-1 with given FRAC_DIGITS!");
+	static_assert(NUMBER_DEC_DIGITS_FLOOR >= FRAC_DIGITS, "BigFxp: WIDTH_BITS is not enought to store +/-1 with given FRAC_DIGITS!");
 
 	using BigIntValue = BigInt<WIDTH_BITS>;
 	using WiderBigIntValue = BigInt<WIDTH_BITS * 2u>;
@@ -31,6 +35,18 @@ struct BigFxp {
 	static constexpr BigIntValue int_value_ten_exp(size_t arg) {
 		BigIntValue result(1);
 		while(arg--) {
+			result.chunk_mult(10u);
+		}
+		return result;
+	}
+
+	static constexpr BigIntValue int_value_ten_exp_ovf(size_t arg) {
+		BigIntValue result(INT_MULIPLIER);
+		while(arg--) {
+			if(result.cmp_unsigned_greater(LIMIT_MULT_BASE)) {
+				result.clear();
+				break;
+			}
 			result.chunk_mult(10u);
 		}
 		return result;
@@ -97,67 +113,23 @@ struct BigFxp {
 	}
 
 	// Round the value to the ceil.
-	constexpr BigFxp round_ceil(const size_t digits) const {
-		BigIntValue result(raw_value);
-		if(digits < FRAC_DIGITS) {
-			const BigIntValue exp(int_value_ten_exp(FRAC_DIGITS - digits));
-			const BigIntValue res_mod(result % exp);
-			if(!res_mod.is_zero()) {
-				result -= res_mod;
-				if(!res_mod.msbit()) {
-					result += exp;
-				}
-			}
-		}
-		return BigFxp(result, 0);
+	constexpr BigFxp round_ceil(const ssize_t digits) const {
+		return (digits > 0) ? round_ceil_frac(static_cast<size_t>(digits)) : round_ceil_int(static_cast<size_t>(-digits));
 	}
 
 	// Round the value to the floor.
-	constexpr BigFxp round_floor(const size_t digits) const {
-		BigIntValue result(raw_value);
-		if(digits < FRAC_DIGITS) {
-			const BigIntValue exp(int_value_ten_exp(FRAC_DIGITS - digits));
-			const BigIntValue res_mod(result % exp);
-			if(!res_mod.is_zero()) {
-				result -= res_mod;
-				if(res_mod.msbit()) {
-					result -= exp;
-				}
-			}
-		}
-		return BigFxp(result, 0);
+	constexpr BigFxp round_floor(const ssize_t digits) const {
+		return (digits > 0) ? round_floor_frac(static_cast<size_t>(digits)) : round_floor_int(static_cast<size_t>(-digits));
 	}
 
 	// Round the value to the nearest.
-	constexpr BigFxp round(const size_t digits) const {
-		BigIntValue result(raw_value);
-		if(digits < FRAC_DIGITS) {
-			const BigIntValue exp(int_value_ten_exp(FRAC_DIGITS - digits));
-			const BigIntValue exp_half(exp >> 1u);
-			const BigIntValue res_mod(result % exp);
-			if(!res_mod.is_zero()) {
-				result -= res_mod;
-				if(res_mod > exp_half) {
-					result += exp;
-				} else if(res_mod < (-exp_half)) {
-					result -= exp;
-				}
-			}
-		}
-		return BigFxp(result, 0);
+	constexpr BigFxp round(const ssize_t digits) const {
+		return (digits > 0) ? round_frac(static_cast<size_t>(digits)) : round_int(static_cast<size_t>(-digits));
 	}
 
 	// Drop the digits.
 	constexpr BigFxp round_drop(const size_t digits) const {
-		BigIntValue result(raw_value);
-		if(digits < FRAC_DIGITS) {
-			const BigIntValue exp(int_value_ten_exp(FRAC_DIGITS - digits));
-			const BigIntValue res_mod(result % exp);
-			if(!res_mod.is_zero()) {
-				result -= res_mod;
-			}
-		}
-		return BigFxp(result, 0);
+		return (digits > 0) ? round_drop_frac(static_cast<size_t>(digits)) : round_drop_int(static_cast<size_t>(-digits));
 	}
 
 	// ----------------------------------------------------------------------------
@@ -389,6 +361,134 @@ protected:
 			((x_mult_ten_exp_wide + (y_wide >> 1u)) / y_wide) :
 			((x_mult_ten_exp_wide - (y_wide >> 1u)) / y_wide)
 		);
+	}
+
+	constexpr BigFxp round_ceil_frac(const size_t digits) const {
+		BigIntValue result(raw_value);
+		if(digits < FRAC_DIGITS) {
+			const BigIntValue exp(int_value_ten_exp(FRAC_DIGITS - digits));
+			const BigIntValue res_mod(result % exp);
+			if(!res_mod.is_zero()) {
+				result -= res_mod;
+				if(!res_mod.msbit()) {
+					result += exp;
+				}
+			}
+		}
+		return BigFxp(result, 0);
+	}
+
+	constexpr BigFxp round_ceil_int(const size_t digits) const {
+		BigIntValue result(raw_value);
+		const BigIntValue exp(int_value_ten_exp_ovf(digits));
+		if(exp.is_zero()) {
+			result.clear();
+		} else {
+			const BigIntValue res_mod(result % exp);
+			if(!res_mod.is_zero()) {
+				result -= res_mod;
+				if(!res_mod.msbit()) {
+					result += exp;
+				}
+			}
+		}
+		return BigFxp(result, 0);
+	}
+
+	constexpr BigFxp round_floor_frac(const size_t digits) const {
+		BigIntValue result(raw_value);
+		if(digits < FRAC_DIGITS) {
+			const BigIntValue exp(int_value_ten_exp(FRAC_DIGITS - digits));
+			const BigIntValue res_mod(result % exp);
+			if(!res_mod.is_zero()) {
+				result -= res_mod;
+				if(res_mod.msbit()) {
+					result -= exp;
+				}
+			}
+		}
+		return BigFxp(result, 0);
+	}
+
+	constexpr BigFxp round_floor_int(const size_t digits) const {
+		BigIntValue result(raw_value);
+		const BigIntValue exp(int_value_ten_exp_ovf(digits));
+		if(exp.is_zero()) {
+			result.clear();
+		} else {
+			const BigIntValue res_mod(result % exp);
+			if(!res_mod.is_zero()) {
+				result -= res_mod;
+				if(res_mod.msbit()) {
+					result -= exp;
+				}
+			}
+		}
+		return BigFxp(result, 0);
+	}
+
+	constexpr BigFxp round_frac(const size_t digits) const {
+		BigIntValue result(raw_value);
+		if(digits < FRAC_DIGITS) {
+			const BigIntValue exp(int_value_ten_exp(FRAC_DIGITS - digits));
+			const BigIntValue exp_half(exp >> 1u);
+			const BigIntValue res_mod(result % exp);
+			if(!res_mod.is_zero()) {
+				result -= res_mod;
+				if(res_mod > exp_half) {
+					result += exp;
+				} else if(res_mod < (-exp_half)) {
+					result -= exp;
+				}
+			}
+		}
+		return BigFxp(result, 0);
+	}
+
+	constexpr BigFxp round_int(const size_t digits) const {
+		BigIntValue result(raw_value);
+		const BigIntValue exp(int_value_ten_exp_ovf(digits));
+		if(exp.is_zero()) {
+			result.clear();
+		} else {
+			const BigIntValue exp_half(exp >> 1u);
+			const BigIntValue res_mod(result % exp);
+			if(!res_mod.is_zero()) {
+				result -= res_mod;
+				if(res_mod > exp_half) {
+					result += exp;
+				} else if(res_mod < (-exp_half)) {
+					result -= exp;
+				}
+			}
+		}
+		return BigFxp(result, 0);
+	}
+
+	constexpr BigFxp round_drop_frac(const size_t digits) const {
+		BigIntValue result(raw_value);
+		if(digits < FRAC_DIGITS) {
+			const BigIntValue exp(int_value_ten_exp(FRAC_DIGITS - digits));
+			const BigIntValue res_mod(result % exp);
+			if(!res_mod.is_zero()) {
+				result -= res_mod;
+			}
+		}
+		return BigFxp(result, 0);
+	}
+
+	constexpr BigFxp round_drop_int(const size_t digits) const {
+		BigIntValue result(raw_value);
+		const BigIntValue exp(int_value_ten_exp_ovf(digits));
+		if(exp.is_zero()) {
+			result.clear();
+		} else {
+			const BigIntValue res_mod(result % exp);
+			if(!res_mod.is_zero()) {
+				result -= res_mod;
+			}
+		}
+		return BigFxp(result, 0);
 	}
 
 };

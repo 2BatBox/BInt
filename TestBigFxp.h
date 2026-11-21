@@ -63,7 +63,8 @@ public:
 		ITERATE_INT_COMPATIBLE(test_inc_dec, AUTOTEST_ROUNDS);
 		ITERATE_INT_COMPATIBLE(test_add_sub, AUTOTEST_ROUNDS);
 		ITERATE_INT_COMPATIBLE(test_mult_div, AUTOTEST_ROUNDS);
-		ITERATE_INT_COMPATIBLE(test_round, AUTOTEST_ROUNDS);
+		ITERATE_INT_COMPATIBLE(test_round_frac, AUTOTEST_ROUNDS);
+		ITERATE_INT_COMPATIBLE(test_round_int, AUTOTEST_ROUNDS);
 		test_type_conversion();
 
 //		test_performance_header();
@@ -276,12 +277,12 @@ private:
 	}
 
 	template <size_t W, size_t P>
-	void test_round(size_t rounds) {
+	void test_round_frac(size_t rounds) {
 		using Type_t = bint::BigFxp<W, P>;
 
-		test_round_value<W, P>(Type_t(0));
-		test_round_value<W, P>(++Type_t::min());
-		test_round_value<W, P>(--Type_t::max());
+		test_round_frac_value<W, P>(Type_t(0));
+		test_round_frac_value<W, P>(++Type_t::min());
+		test_round_frac_value<W, P>(--Type_t::max());
 
 		while(rounds--) {
 			auto val = RndFxpGen<W, P>::next();
@@ -290,17 +291,18 @@ private:
 			} else {
 				--val;
 			}
-			test_round_value<W, P>(val);
+			test_round_frac_value<W, P>(val);
 		}
 	}
 
 	template <size_t W, size_t P>
-	void test_round_value(const bint::BigFxp<W, P>& x) {
+	void test_round_frac_value(const bint::BigFxp<W, P>& x) {
+		const auto dig_max = static_cast<ssize_t>(P);
 		ASSERT(x.round_ceil(P) == x);
 		ASSERT(x.round(P) == x);
 		ASSERT(x.round_floor(P) == x);
 
-		for(size_t dig = 0; dig < P; ++dig) {
+		for(ssize_t dig = 0; dig < dig_max; ++dig) {
 			ASSERT(x.round_floor(dig) <= x.round(dig));
 			ASSERT(x.round_ceil(dig) >= x.round(dig));
 			ASSERT(x.round_floor(dig) <= x);
@@ -308,6 +310,36 @@ private:
 
 			ASSERT(x.round_floor(dig) > (x - 1));
 			ASSERT(x.round_ceil(dig) < (x + 1));
+
+			if(x.round_floor(dig) != x) {
+				ASSERT(x.round_floor(dig) < x.round_ceil(dig));
+			}
+		}
+	}
+
+	template <size_t W, size_t P>
+	void test_round_int(size_t rounds) {
+		using Type_t = bint::BigFxp<W, P>;
+
+		test_round_int_value<W, P>(Type_t(0));
+		test_round_int_value<W, P>(Type_t::min() / 10);
+		test_round_int_value<W, P>(Type_t::max() / 10);
+
+		while(rounds--) {
+			auto val = RndFxpGen<W, P>::next();
+			test_round_int_value<W, P>(val / 10);
+		}
+	}
+
+	template <size_t W, size_t P>
+	void test_round_int_value(const bint::BigFxp<W, P>& x) {
+		const ssize_t dig_max = bint::BigFxp<W, P>::INT_DEC_DIGITS_FLOOR;
+
+		for(ssize_t dig = 0; dig > (-dig_max); --dig) {
+			ASSERT(x.round_floor(dig) <= x.round(dig));
+			ASSERT(x.round_ceil(dig) >= x.round(dig));
+			ASSERT(x.round_floor(dig) <= x);
+			ASSERT(x.round_ceil(dig) >= x);
 
 			if(x.round_floor(dig) != x) {
 				ASSERT(x.round_floor(dig) < x.round_ceil(dig));
